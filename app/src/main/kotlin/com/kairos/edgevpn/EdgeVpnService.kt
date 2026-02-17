@@ -10,6 +10,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import edgevpn.Edgevpn
+import edgevpn.SocketProtector
 
 class EdgeVpnService : VpnService() {
 
@@ -26,6 +27,13 @@ class EdgeVpnService : VpnService() {
     }
 
     private var tunPfd: ParcelFileDescriptor? = null
+
+    /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface. */
+    private val socketProtector = object : SocketProtector {
+        override fun protect(fd: Long): Boolean {
+            return this@EdgeVpnService.protect(fd.toInt())
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -67,6 +75,11 @@ class EdgeVpnService : VpnService() {
             stopSelf()
             return
         }
+
+        // Register the socket protector BEFORE starting Go networking.
+        // Every socket fd created by libp2p will be passed through
+        // VpnService.protect() so it bypasses the TUN interface.
+        Edgevpn.setSocketProtector(socketProtector)
 
         val fd = pfd.detachFd()
         tunPfd = pfd
