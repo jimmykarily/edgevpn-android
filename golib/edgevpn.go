@@ -8,9 +8,12 @@ import (
 	"os"
 	"sync"
 
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/mudler/edgevpn/pkg/config"
 	"github.com/mudler/edgevpn/pkg/node"
 	"github.com/mudler/edgevpn/pkg/vpn"
+	ma "github.com/multiformats/go-multiaddr"
 
 	// Required by gomobile's generated binding code at build time.
 	_ "golang.org/x/mobile/bind"
@@ -66,6 +69,25 @@ func Start(fd int, token string) error {
 		tunFile.Close()
 		return fmt.Errorf("config error: %w", err)
 	}
+
+	// Inject a protected TCP transport so every socket fd is passed through
+	// VpnService.protect() before connect/bind. This prevents the VPN's own
+	// control-plane sockets from being routed back into the TUN interface.
+	//
+	// NoTransports clears the default set (which includes QUIC/WebRTC that
+	// we can't protect yet), then we add back TCP with our protected dialer.
+	protectedDialerForAddr := func(_ ma.Multiaddr) (tcp.ContextDialer, error) {
+		return ProtectedDialer(), nil
+	}
+	nodeOpts = append(nodeOpts,
+		node.WithLibp2pAdditionalOptions(
+			libp2p.NoTransports,
+			libp2p.Transport(tcp.NewTCPTransport,
+				tcp.WithDialerForAddr(protectedDialerForAddr),
+				tcp.DisableReuseport(),
+			),
+		),
+	)
 
 	vpnOpts = append(vpnOpts, vpn.WithInterface(tunFile))
 
