@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">EdgeVPN</string>
-    <string name="status_placeholder">Not connected</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="no_token_message">No token configured. Set one in settings to connect.</string>
+    <string name="open_settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="token_hint">Paste EdgeVPN token</string>
+    <string name="save_token">Save token</string>
+    <string name="delete_token">Delete token</string>
+    <string name="token_saved">Token saved</string>
+    <string name="token_deleted">Token deleted</string>
+    <string name="token_empty_error">Token cannot be empty</string>
+    <string name="token_configured">Token is configured</string>
 </resources>
