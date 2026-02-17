@@ -29,7 +29,7 @@ GOMOBILE := $(or $(shell command -v gomobile 2>/dev/null),$(GOPATH_BIN)/gomobile
 # ── Outputs ──────────────────────────────────────────────────────
 GOLIB_AAR  := app/libs/edgevpn.aar
 APK        := app/build/outputs/apk/debug/app-debug.apk
-GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod
+GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod golib/go.sum
 APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
 SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 
@@ -89,6 +89,10 @@ $(GOPATH_BIN)/gomobile:
 	go install golang.org/x/mobile/cmd/gobind@latest
 
 # ── Go library → AAR ────────────────────────────────────────────
+# -checklinkname=0: the anet library (transitive dep via libp2p) uses
+# //go:linkname to patch Go's internal net.zoneCache for Android DNS fixes.
+# Go 1.23+ rejects this by default. Disable the check until anet is fixed
+# upstream: https://github.com/wlynxg/anet/issues/11
 $(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
 	@echo "==> Building Go library (gomobile bind)..."
 	@mkdir -p app/libs
@@ -96,6 +100,7 @@ $(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
 	  PATH=$(JAVA_HOME)/bin:$$PATH \
 	  ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VER) \
 	  $(GOMOBILE) bind -target android/arm64 -androidapi $(MIN_SDK) \
+	    -ldflags="-checklinkname=0" \
 	    -o $(CURDIR)/$(GOLIB_AAR) .
 
 golib: $(GOLIB_AAR)
@@ -111,7 +116,12 @@ app: $(APK)
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)
 	@echo "==> Installing APK on connected device..."
+	-$(ADB) shell am force-stop com.kairos.edgevpn
 	$(ADB) install -r $(APK)
+
+# ── Logs from device ─────────────────────────────────────────────
+logs:
+	$(ADB) logcat -v time --pid=$$($(ADB) shell pidof -s com.kairos.edgevpn)
 
 # ── Convenience ──────────────────────────────────────────────────
 setup: $(JAVA_HOME)/bin/java $(SDK_STAMP) $(GRADLE) $(GOPATH_BIN)/gomobile

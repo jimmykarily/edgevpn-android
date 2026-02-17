@@ -2,16 +2,126 @@
 // gomobile bind exports these functions as Java methods in the edgevpn.Edgevpn class.
 package edgevpn
 
-// Start initializes the VPN with the given base64-encoded configuration token.
-func Start(config string) error {
+import (
+	"context"
+	"fmt"
+	"os"
+	"sync"
+
+	"github.com/mudler/edgevpn/pkg/config"
+	"github.com/mudler/edgevpn/pkg/node"
+	"github.com/mudler/edgevpn/pkg/vpn"
+
+	// Required by gomobile's generated binding code at build time.
+	_ "golang.org/x/mobile/bind"
+)
+
+var (
+	mu       sync.Mutex
+	cancelFn context.CancelFunc
+	tunFile  *os.File
+	vpnState = "disconnected"
+)
+
+// Start initialises the VPN with a TUN file descriptor and a base64-encoded
+// EdgeVPN token. The fd must come from Android's VpnService.Builder.establish().
+// This function returns immediately; the VPN runs in a background goroutine.
+func Start(fd int, token string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if cancelFn != nil {
+		return fmt.Errorf("already running")
+	}
+
+	tunFile = os.NewFile(uintptr(fd), "tun")
+	if tunFile == nil {
+		return fmt.Errorf("invalid file descriptor: %d", fd)
+	}
+
+	address := "10.1.0.2/24"
+
+	llger := &bufferLogger{}
+
+	cfg := config.Config{
+		NetworkToken:   token,
+		Address:        address,
+		BootstrapIface: false,
+		LowProfile:     true,
+		Concurrency:    1,
+		PacketMTU:      1500,
+		InterfaceMTU:   1500,
+		FrameTimeout:   "15s",
+		LogLevel:       "info",
+		Libp2pLogLevel: "error",
+		Discovery: config.Discovery{
+			DHT:  true,
+			MDNS: true,
+		},
+		Ledger: config.Ledger{},
+	}
+
+	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
+	if err != nil {
+		tunFile.Close()
+		return fmt.Errorf("config error: %w", err)
+	}
+
+	vpnOpts = append(vpnOpts, vpn.WithInterface(tunFile))
+
+	vpnNodeOpts, err := vpn.Register(vpnOpts...)
+	if err != nil {
+		tunFile.Close()
+		return fmt.Errorf("vpn register error: %w", err)
+	}
+	nodeOpts = append(nodeOpts, vpnNodeOpts...)
+
+	n, err := node.New(nodeOpts...)
+	if err != nil {
+		tunFile.Close()
+		return fmt.Errorf("node create error: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancelFn = cancel
+	vpnState = "connecting"
+
+	go func() {
+		err := n.Start(ctx)
+		mu.Lock()
+		defer mu.Unlock()
+		cancelFn = nil
+		if err != nil && ctx.Err() == nil {
+			vpnState = "error: " + err.Error()
+		} else {
+			vpnState = "disconnected"
+		}
+	}()
+
+	vpnState = "connected"
 	return nil
 }
 
-// Stop shuts down the VPN.
+// Stop shuts down the VPN and closes the TUN file descriptor.
+// Closing the fd tells Android the VPN interface is gone so it tears down routing.
 func Stop() {
+	mu.Lock()
+	defer mu.Unlock()
+	if cancelFn != nil {
+		cancelFn()
+		cancelFn = nil
+	}
+	if tunFile != nil {
+		tunFile.Close()
+		tunFile = nil
+	}
+	vpnState = "disconnected"
 }
 
 // Status returns the current VPN status as a string.
 func Status() string {
-	return "disconnected"
+	mu.Lock()
+	defer mu.Unlock()
+	return vpnState
 }
+

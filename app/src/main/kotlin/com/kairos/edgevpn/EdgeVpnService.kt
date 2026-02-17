@@ -7,7 +7,9 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import edgevpn.Edgevpn
 
 class EdgeVpnService : VpnService() {
 
@@ -15,6 +17,7 @@ class EdgeVpnService : VpnService() {
         const val ACTION_CONNECT = "com.kairos.edgevpn.CONNECT"
         const val ACTION_DISCONNECT = "com.kairos.edgevpn.DISCONNECT"
 
+        private const val TAG = "EdgeVpnService"
         private const val CHANNEL_ID = "edgevpn_status"
         private const val NOTIFICATION_ID = 1
 
@@ -22,7 +25,7 @@ class EdgeVpnService : VpnService() {
             private set
     }
 
-    private var tunFd: ParcelFileDescriptor? = null
+    private var tunPfd: ParcelFileDescriptor? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -41,33 +44,52 @@ class EdgeVpnService : VpnService() {
     }
 
     private fun connect() {
-        if (tunFd != null) return
+        if (tunPfd != null) return
 
-        startForeground(NOTIFICATION_ID, buildNotification())
-
-        tunFd = Builder()
-            .addAddress("10.0.0.2", 32)
-            .addRoute("10.0.0.0", 24)
-            .setMtu(1500)
-            .setSession("EdgeVPN")
-            .establish()
-
-        if (tunFd == null) {
+        val token = TokenStore.load(this)
+        if (token == null) {
+            Log.e(TAG, "No token configured")
             stopSelf()
             return
         }
 
-        isRunning = true
+        startForeground(NOTIFICATION_ID, buildNotification())
 
-        // TODO: pass tunFd.detachFd() to Go library
+        val pfd = Builder()
+            .addAddress("10.1.0.2", 24)
+            .addRoute("10.1.0.0", 24)
+            .setMtu(1500)
+            .setSession("EdgeVPN")
+            .establish()
+
+        if (pfd == null) {
+            Log.e(TAG, "VPN establish() returned null")
+            stopSelf()
+            return
+        }
+
+        val fd = pfd.detachFd()
+        tunPfd = pfd
+
+        try {
+            Edgevpn.start(fd.toLong(), token)
+            isRunning = true
+            Log.i(TAG, "VPN started")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start VPN", e)
+            isRunning = false
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun disconnect() {
+        Edgevpn.stop()
         isRunning = false
-        tunFd?.close()
-        tunFd = null
+        tunPfd = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+        Log.i(TAG, "VPN stopped")
     }
 
     override fun onRevoke() {

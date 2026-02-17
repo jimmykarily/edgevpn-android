@@ -3,13 +3,18 @@ package com.kairos.edgevpn
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import edgevpn.Edgevpn
+import edgevpn.LogReceiver
 
 class MainActivity : AppCompatActivity() {
 
@@ -17,6 +22,24 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectedGroup: LinearLayout
     private lateinit var connectButton: MaterialButton
     private lateinit var statusText: TextView
+    private lateinit var toggleLogsButton: MaterialButton
+    private lateinit var logScrollView: ScrollView
+    private lateinit var logText: TextView
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var logsVisible = false
+
+    private val logReceiver = object : LogReceiver {
+        override fun onLog(line: String?) {
+            handler.post {
+                if (logsVisible && line != null) {
+                    logText.append(line)
+                    logText.append("\n")
+                    logScrollView.post { logScrollView.fullScroll(View.FOCUS_DOWN) }
+                }
+            }
+        }
+    }
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -36,6 +59,9 @@ class MainActivity : AppCompatActivity() {
         connectedGroup = findViewById(R.id.connectedGroup)
         connectButton = findViewById(R.id.connectButton)
         statusText = findViewById(R.id.statusText)
+        toggleLogsButton = findViewById(R.id.toggleLogsButton)
+        logScrollView = findViewById(R.id.logScrollView)
+        logText = findViewById(R.id.logText)
 
         findViewById<MaterialButton>(R.id.openSettingsButton).setOnClickListener {
             openSettings()
@@ -47,11 +73,25 @@ class MainActivity : AppCompatActivity() {
         connectButton.setOnClickListener {
             if (EdgeVpnService.isRunning) disconnect() else connect()
         }
+
+        toggleLogsButton.setOnClickListener {
+            logsVisible = !logsVisible
+            logScrollView.visibility = if (logsVisible) View.VISIBLE else View.GONE
+            toggleLogsButton.text = getString(
+                if (logsVisible) R.string.hide_logs else R.string.show_logs
+            )
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updateView()
+        Edgevpn.setLogReceiver(logReceiver)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Edgevpn.setLogReceiver(null)
     }
 
     private fun openSettings() {
@@ -96,6 +136,11 @@ class MainActivity : AppCompatActivity() {
 
         noTokenGroup.visibility = if (hasToken) View.GONE else View.VISIBLE
         connectedGroup.visibility = if (hasToken) View.VISIBLE else View.GONE
+        toggleLogsButton.visibility = if (hasToken) View.VISIBLE else View.GONE
+
+        if (!hasToken) {
+            logScrollView.visibility = View.GONE
+        }
 
         if (hasToken) {
             statusText.text = if (running) "Status: connected" else "Status: disconnected"
