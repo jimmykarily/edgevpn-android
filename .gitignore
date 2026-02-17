@@ -1,0 +1,21 @@
+# Downloaded tools
+binaries/
+
+# Build outputs
+app/build/
+app/libs/*.aar
+build/
+.gradle/
+
+# Gradle generated
+local.properties
+
+# Go
+golib/vendor/
+
+# IDE
+.idea/
+*.iml
+
+# OS
+.DS_Store
