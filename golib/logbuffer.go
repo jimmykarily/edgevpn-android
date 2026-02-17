@@ -6,6 +6,63 @@ import (
 	"time"
 )
 
+// LogDialError logs a dial failure to the app log (and thus logcat) so we can
+// see the underlying error (e.g. connection refused, permission denied).
+// Uses WARN level so it is not dropped when min log level is "warn".
+func LogDialError(addr string, err error) {
+	if err != nil {
+		emit("WARN ", fmt.Sprintf("dial error %s: %v", addr, err))
+	}
+}
+
+// logLevelOrder defines ordering for filtering (higher = more severe).
+var logLevelOrder = map[string]int{
+	"DEBUG": 0, "INFO ": 1, "WARN ": 2, "ERROR": 3, "FATAL": 4, "PANIC": 4,
+}
+
+var (
+	minLogLevel   = "WARN " // default: suppress DEBUG/INFO discovery loop spam
+	minLogLevelMu sync.RWMutex
+)
+
+// normalizeLevel maps config strings (e.g. "warn") to the keys used in emit.
+func normalizeLevel(s string) string {
+	switch s {
+	case "debug":
+		return "DEBUG"
+	case "info":
+		return "INFO "
+	case "warn", "warning":
+		return "WARN "
+	case "error":
+		return "ERROR"
+	case "fatal", "panic":
+		return "FATAL"
+	default:
+		return "WARN "
+	}
+}
+
+// SetMinLogLevel sets the minimum level to emit (debug, info, warn, error, fatal).
+// Used by Start() so the config LogLevel is respected.
+func SetMinLogLevel(level string) {
+	minLogLevelMu.Lock()
+	defer minLogLevelMu.Unlock()
+	minLogLevel = normalizeLevel(level)
+}
+
+func shouldEmit(level string) bool {
+	minLogLevelMu.RLock()
+	min := minLogLevel
+	minLogLevelMu.RUnlock()
+	minVal := logLevelOrder[min]
+	if minVal == 0 {
+		minVal = logLevelOrder["WARN "]
+	}
+	lv := logLevelOrder[level]
+	return lv >= minVal
+}
+
 // LogReceiver is implemented on the Android side to receive log lines in
 // real time. gomobile generates a Java interface that Kotlin can implement.
 type LogReceiver interface {
@@ -26,6 +83,9 @@ func SetLogReceiver(r LogReceiver) {
 }
 
 func emit(level, msg string) {
+	if !shouldEmit(level) {
+		return
+	}
 	ts := time.Now().Format("15:04:05")
 	line := fmt.Sprintf("[%s] %s %s", ts, level, msg)
 

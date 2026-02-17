@@ -3,6 +3,7 @@ package com.kairos.edgevpn
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
+import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -31,6 +32,10 @@ class MainActivity : AppCompatActivity() {
 
     private val logReceiver = object : LogReceiver {
         override fun onLog(line: String?) {
+            if (line != null) {
+                // Send to logcat so "make logs" shows the same as the in-app log viewer
+                Log.i(LOG_TAG, line.trim())
+            }
             handler.post {
                 if (logsVisible && line != null) {
                     logText.append(line)
@@ -39,6 +44,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        private const val LOG_TAG = "EdgeVPN"
     }
 
     private val vpnPermissionLauncher = registerForActivityResult(
