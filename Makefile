@@ -29,8 +29,9 @@ GOMOBILE := $(or $(shell command -v gomobile 2>/dev/null),$(GOPATH_BIN)/gomobile
 # ── Outputs ──────────────────────────────────────────────────────
 GOLIB_AAR  := app/libs/edgevpn.aar
 APK        := app/build/outputs/apk/debug/app-debug.apk
-GO_SOURCES := $(wildcard golib/*.go) golib/go.mod
-SDK_STAMP  := $(ANDROID_HOME)/platform-tools/adb
+GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod
+APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
+SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 
 # Delete targets whose recipes fail, so stale/empty files don't block rebuilds.
 .DELETE_ON_ERROR:
@@ -100,7 +101,7 @@ $(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
 golib: $(GOLIB_AAR)
 
 # ── Android APK ──────────────────────────────────────────────────
-$(APK): $(GOLIB_AAR) build.gradle.kts app/build.gradle.kts settings.gradle.kts | $(GRADLE) $(SDK_STAMP)
+$(APK): $(GOLIB_AAR) $(APP_SOURCES) build.gradle.kts app/build.gradle.kts settings.gradle.kts | $(GRADLE) $(SDK_STAMP)
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	@echo "==> Building Android APK..."
 	$(GRADLE) -p $(CURDIR) assembleDebug
