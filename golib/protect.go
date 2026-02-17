@@ -26,23 +26,36 @@ func SetSocketProtector(p SocketProtector) {
 }
 
 // protectSocket calls VpnService.protect(fd) if a protector is registered.
-func protectSocket(fd uintptr) {
+// It returns true if the socket is protected, false otherwise (no protector or protect failed).
+func protectSocket(fd uintptr) bool {
 	protectMu.RLock()
 	p := protector
 	protectMu.RUnlock()
-	if p != nil {
-		p.Protect(int(fd))
+	if p == nil {
+		return false
 	}
+	return p.Protect(int(fd))
 }
 
 // controlFunc is a net.Dialer / net.ListenConfig Control function that
 // calls VpnService.protect(fd) on every newly created socket.
+// If protect fails, we return an error so the socket is not used (avoids "operation not permitted").
 func controlFunc(network, address string, c syscall.RawConn) error {
-	var err error
+	var protected bool
 	c.Control(func(fd uintptr) {
-		protectSocket(fd)
+		protected = protectSocket(fd)
 	})
-	return err
+	if !protected {
+		return &protectError{network: network, address: address}
+	}
+	return nil
+}
+
+// protectError is returned when VpnService.protect(fd) fails or no protector is set.
+type protectError struct{ network, address string }
+
+func (e *protectError) Error() string {
+	return "socket protect failed (VpnService.protect returned false or not set): " + e.network + " " + e.address
 }
 
 // ProtectedDialer returns a net.Dialer whose Control function calls

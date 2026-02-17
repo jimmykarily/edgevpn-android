@@ -6,8 +6,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import androidx.core.app.NotificationCompat
 import edgevpn.Edgevpn
 import edgevpn.SocketProtector
@@ -28,10 +32,28 @@ class EdgeVpnService : VpnService() {
 
     private var tunPfd: ParcelFileDescriptor? = null
 
-    /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface. */
+    /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
+     * Must run on the main thread or protect() can fail with "operation not permitted". */
     private val socketProtector = object : SocketProtector {
         override fun protect(fd: Long): Boolean {
-            return this@EdgeVpnService.protect(fd.toInt())
+            if (Looper.getMainLooper().isCurrentThread) {
+                val ok = this@EdgeVpnService.protect(fd.toInt())
+                if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
+                return ok
+            }
+            val latch = CountDownLatch(1)
+            val result = BooleanArray(1)
+            val mainHandler = Handler(Looper.getMainLooper())
+            mainHandler.postAtFrontOfQueue {
+                result[0] = this@EdgeVpnService.protect(fd.toInt())
+                if (!result[0]) Log.w(TAG, "VpnService.protect($fd) returned false")
+                latch.countDown()
+            }
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                Log.e(TAG, "VpnService.protect($fd) timed out (5s) waiting for main thread")
+                return false
+            }
+            return result[0]
         }
     }
 

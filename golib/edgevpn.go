@@ -5,7 +5,9 @@ package edgevpn
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"runtime"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -18,6 +20,17 @@ import (
 	// Required by gomobile's generated binding code at build time.
 	_ "golang.org/x/mobile/bind"
 )
+
+// loggingDialer wraps a net.Dialer and logs the underlying error when a dial fails.
+type loggingDialer struct{ d *net.Dialer }
+
+func (l *loggingDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := l.d.DialContext(ctx, network, address)
+	if err != nil {
+		LogDialError(network+" "+address, err)
+	}
+	return conn, err
+}
 
 var (
 	mu       sync.Mutex
@@ -55,15 +68,16 @@ func Start(fd int, token string) error {
 		PacketMTU:      1500,
 		InterfaceMTU:   1500,
 		FrameTimeout:   "15s",
-		LogLevel:       "info",
+		LogLevel:       "warn", // avoid DEBUG/INFO discovery loop spam in logs
 		Libp2pLogLevel: "error",
 		Discovery: config.Discovery{
 			DHT:  true,
-			MDNS: true,
+			MDNS: runtime.GOOS != "android", // mDNS uses net.InterfaceAddrs() -> netlink permission denied on Android
 		},
 		Ledger: config.Ledger{},
 	}
 
+	SetMinLogLevel(cfg.LogLevel)
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
 		tunFile.Close()
@@ -76,8 +90,13 @@ func Start(fd int, token string) error {
 	//
 	// NoTransports clears the default set (which includes QUIC/WebRTC that
 	// we can't protect yet), then we add back TCP with our protected dialer.
+	// On Android we use a custom dial that creates the socket, protects it, then
+	// connects—guaranteeing protect() runs before connect (avoids "operation not permitted").
 	protectedDialerForAddr := func(_ ma.Multiaddr) (tcp.ContextDialer, error) {
-		return ProtectedDialer(), nil
+		if runtime.GOOS == "android" {
+			return newAndroidProtectedDialer(), nil
+		}
+		return &loggingDialer{d: ProtectedDialer()}, nil
 	}
 	nodeOpts = append(nodeOpts,
 		node.WithLibp2pAdditionalOptions(
