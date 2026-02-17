@@ -1,14 +1,15 @@
 package com.kairos.edgevpn
 
 import android.content.Intent
+import android.net.VpnService
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-import edgevpn.Edgevpn
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,7 +17,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var connectedGroup: LinearLayout
     private lateinit var connectButton: MaterialButton
     private lateinit var statusText: TextView
-    private var connected = false
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            startVpnService()
+        } else {
+            Toast.makeText(this, "VPN permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +45,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         connectButton.setOnClickListener {
-            if (connected) disconnect() else connect()
+            if (EdgeVpnService.isRunning) disconnect() else connect()
         }
     }
 
@@ -49,38 +59,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun connect() {
-        val token = TokenStore.load(this)
-        if (token == null) {
+        if (TokenStore.load(this) == null) {
             updateView()
             return
         }
 
-        try {
-            Edgevpn.start(token)
-            connected = true
-            updateView()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+        val intent = VpnService.prepare(this)
+        if (intent != null) {
+            vpnPermissionLauncher.launch(intent)
+        } else {
+            startVpnService()
         }
     }
 
+    private fun startVpnService() {
+        val intent = Intent(this, EdgeVpnService::class.java).apply {
+            action = EdgeVpnService.ACTION_CONNECT
+        }
+        startForegroundService(intent)
+        statusText.text = "Status: connected"
+        connectButton.text = getString(R.string.disconnect)
+    }
+
     private fun disconnect() {
-        Edgevpn.stop()
-        connected = false
-        updateView()
+        val intent = Intent(this, EdgeVpnService::class.java).apply {
+            action = EdgeVpnService.ACTION_DISCONNECT
+        }
+        startService(intent)
+        statusText.text = "Status: disconnected"
+        connectButton.text = getString(R.string.connect)
     }
 
     private fun updateView() {
         val hasToken = TokenStore.load(this) != null
+        val running = EdgeVpnService.isRunning
 
         noTokenGroup.visibility = if (hasToken) View.GONE else View.VISIBLE
         connectedGroup.visibility = if (hasToken) View.VISIBLE else View.GONE
 
         if (hasToken) {
-            val status = Edgevpn.status()
-            statusText.text = "Status: $status"
+            statusText.text = if (running) "Status: connected" else "Status: disconnected"
             connectButton.text = getString(
-                if (connected) R.string.disconnect else R.string.connect
+                if (running) R.string.disconnect else R.string.connect
             )
         }
     }
