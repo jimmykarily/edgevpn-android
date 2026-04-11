@@ -9,6 +9,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
@@ -74,7 +75,24 @@ func Start(fd int, token string) error {
 			DHT:  true,
 			MDNS: runtime.GOOS != "android", // mDNS uses net.InterfaceAddrs() -> netlink permission denied on Android
 		},
-		Ledger: config.Ledger{},
+		// Match the CLI defaults (cmd/util.go: autorelay=true, holepunch=true).
+		// These are essential for NAT traversal when both peers are behind NAT:
+		// AutoRelay reserves a slot on a public circuit v2 relay and advertises
+		// /p2p-circuit addresses; HolePunch coordinates DCUtR to establish a direct
+		// connection once a relayed path exists.
+		Connection: config.Connection{
+			AutoRelay: true,
+			HolePunch: true,
+		},
+		// CLI defaults both of these to 10s (cmd/util.go). If left at zero, vpn's
+		// BackoffTicker(MaxInterval=0) misbehaves and the VPN service's
+		// Announce() loop (which publishes this node's IP into the blockchain
+		// ledger) either never fires or spins. Without it, the phone appears in
+		// /api/nodes but not in /api/machines and never shows in the web UI.
+		Ledger: config.Ledger{
+			AnnounceInterval: 10 * time.Second,
+			SyncInterval:     10 * time.Second,
+		},
 	}
 
 	SetMinLogLevel(cfg.LogLevel)
@@ -128,13 +146,16 @@ func Start(fd int, token string) error {
 	vpnState = "connecting"
 
 	go func() {
+		emit("INFO ", "node.Start: entering (blocks in VPN service readPackets loop)")
 		err := n.Start(ctx)
 		mu.Lock()
 		defer mu.Unlock()
 		cancelFn = nil
 		if err != nil && ctx.Err() == nil {
+			emit("ERROR", fmt.Sprintf("node.Start returned error: %v", err))
 			vpnState = "error: " + err.Error()
 		} else {
+			emit("INFO ", "node.Start returned cleanly (context cancelled)")
 			vpnState = "disconnected"
 		}
 	}()
