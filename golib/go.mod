@@ -3,7 +3,7 @@ module github.com/kairos-io/edgevpn-android/golib
 go 1.25.0
 
 require (
-	github.com/libp2p/go-libp2p v0.45.0
+	github.com/libp2p/go-libp2p v0.47.0
 	github.com/mudler/edgevpn v0.31.1
 	github.com/multiformats/go-multiaddr v0.16.1
 	golang.org/x/mobile v0.0.0-20260211191516-dcd2a3258864
@@ -140,5 +140,3 @@ require (
 )
 
 replace github.com/mudler/edgevpn => ../../edgevpn
-
-replace github.com/libp2p/go-libp2p => ../../../go-libp2p
