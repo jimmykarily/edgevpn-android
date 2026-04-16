@@ -55,8 +55,8 @@ func shouldEmit(level string) bool {
 	minLogLevelMu.RLock()
 	min := minLogLevel
 	minLogLevelMu.RUnlock()
-	minVal := logLevelOrder[min]
-	if minVal == 0 {
+	minVal, ok := logLevelOrder[min]
+	if !ok {
 		minVal = logLevelOrder["WARN "]
 	}
 	lv := logLevelOrder[level]

@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
@@ -31,6 +33,7 @@ class EdgeVpnService : VpnService() {
     }
 
     private var tunPfd: ParcelFileDescriptor? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
      * Must run on the main thread or protect() can fail with "operation not permitted". */
@@ -98,6 +101,15 @@ class EdgeVpnService : VpnService() {
             return
         }
 
+        // Acquire MulticastLock so the WiFi chip delivers mDNS multicast packets
+        // to the app. Without this, Android drops incoming multicast in hardware.
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        multicastLock = wifiManager.createMulticastLock("edgevpn-mdns").also {
+            it.setReferenceCounted(true)
+            it.acquire()
+            Log.i(TAG, "MulticastLock acquired")
+        }
+
         // Register the socket protector BEFORE starting Go networking.
         // Every socket fd created by libp2p will be passed through
         // VpnService.protect() so it bypasses the TUN interface.
@@ -122,6 +134,11 @@ class EdgeVpnService : VpnService() {
         Edgevpn.stop()
         isRunning = false
         tunPfd = null
+        multicastLock?.let {
+            if (it.isHeld) it.release()
+            multicastLock = null
+            Log.i(TAG, "MulticastLock released")
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         Log.i(TAG, "VPN stopped")

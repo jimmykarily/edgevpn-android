@@ -13,8 +13,8 @@ type SocketProtector interface {
 }
 
 var (
-	protectMu   sync.RWMutex
-	protector   SocketProtector
+	protectMu sync.RWMutex
+	protector SocketProtector
 )
 
 // SetSocketProtector registers the Android VpnService.protect callback.
@@ -42,9 +42,12 @@ func protectSocket(fd uintptr) bool {
 // If protect fails, we return an error so the socket is not used (avoids "operation not permitted").
 func controlFunc(network, address string, c syscall.RawConn) error {
 	var protected bool
-	c.Control(func(fd uintptr) {
+	controlErr := c.Control(func(fd uintptr) {
 		protected = protectSocket(fd)
 	})
+	if controlErr != nil {
+		return controlErr
+	}
 	if !protected {
 		return &protectError{network: network, address: address}
 	}
