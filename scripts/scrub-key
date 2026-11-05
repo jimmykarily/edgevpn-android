@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Copies stdin to stdout with every trace of an edgevpn network key removed.
+
+usage: scrub-key <token-file>
+       scrub-key --self-test
+
+The token file holds the key as edgevpn prints it with -g -b: base64 of a
+YAML document whose string values (the OTP keys, room, rendezvous and mDNS
+names) are secrets too, and a log may show any of them. Any run of 12 or more
+characters that also occurs in the key or in one of those values is replaced,
+so a key cut short ("abc...xyz") or split over two lines is caught as well.
+
+With no usable token file it prints nothing and exits 2, so a caller never
+shows text it could not scrub.
+"""
+
+import base64
+import binascii
+import io
+import sys
+
+WINDOW = 12
+PLACEHOLDER = "<redacted key>"
+
+
+def secrets_of(token):
+    """The key itself and every value of WINDOW or more characters in it."""
+    token = "".join(token.split())
+    out = [token]
+    try:
+        decoded = base64.b64decode(token + "=" * (-len(token) % 4)).decode("utf-8", "replace")
+    except (binascii.Error, ValueError):
+        return out
+    for line in decoded.splitlines():
+        if ":" not in line:
+            continue
+        value = line.split(":", 1)[1].strip().strip("\"'")
+        if len(value) >= WINDOW:
+            out.append(value)
+    return out
+
+
+def windows_of(secrets):
+    return {s[i:i + WINDOW] for s in secrets for i in range(len(s) - WINDOW + 1)}
+
+
+def scrub_line(line, windows):
+    marked = [False] * len(line)
+    for i in range(len(line) - WINDOW + 1):
+        if line[i:i + WINDOW] in windows:
+            for j in range(i, i + WINDOW):
+                marked[j] = True
+    out, i = [], 0
+    while i < len(line):
+        if marked[i]:
+            while i < len(line) and marked[i]:
+                i += 1
+            out.append(PLACEHOLDER)
+        else:
+            out.append(line[i])
+            i += 1
+    return "".join(out)
+
+
+def scrub_stream(raw_in, text_out, windows):
+    """Copies the bytes of raw_in to text_out, line by line, scrubbed. Bytes
+    that are not UTF-8 become U+FFFD, so a stray byte in a log cannot stop
+    the copy halfway."""
+    for raw in raw_in:
+        line = raw.decode("utf-8", "replace")
+        end = "\n" if line.endswith("\n") else ""
+        text_out.write(scrub_line(line[:len(line) - len(end)], windows) + end)
+
+
+def self_test():
+    otp_dht = "Q7mZp2LxV9cKw4RtYb8NfHs3JdUe6GaTo1Ci5Bv0"
+    otp_crypto = "h2KdP9sLq4WmX7zR1cVb8NtYf3GjE6uAo5Ti0Ub"
+    yaml = (
+        "otp:\n"
+        "  dht:\n"
+        "    interval: 9000\n"
+        f"    key: {otp_dht}\n"
+        "    length: 43\n"
+        "  crypto:\n"
+        "    interval: 9000\n"
+        f"    key: {otp_crypto}\n"
+        "    length: 43\n"
+        "room: VtR8kNq2MzX5pLc9WbJ4\n"
+        "rendezvous: Hy6Df1Sa9Gk3Lm7Qw2Er\n"
+        "mdns: Zx4Cv8Bn2Mq6Wt1Ey5Ru\n"
+        "max_message_size: 20971520\n"
+    )
+    token = base64.b64encode(yaml.encode()).decode()
+    windows = windows_of(secrets_of(token + "\n"))
+    half = len(token) // 2
+    cases = [
+        ("full key", f"token={token} end", [token]),
+        ("key split over two lines", f"a {token[:half]}\n{token[half:]} b", [token[:half], token[half:]]),
+        ("JUnit-style cut", f"expected:<{token[:20]}...{token[-15:]}>", [token[:20], token[-15:]]),
+        ("decoded OTP key alone", f"sealing with {otp_crypto} now", [otp_crypto]),
+        ("decoded room name", f"joined room VtR8kNq2MzX5pLc9WbJ4", ["VtR8kNq2MzX5pLc9WbJ4"]),
+    ]
+    failed = 0
+    for name, text, leaks in cases:
+        got = "\n".join(scrub_line(line, windows) for line in text.split("\n"))
+        bad = [leak for leak in leaks if leak in got] + ([] if PLACEHOLDER in got else ["no placeholder"])
+        if bad:
+            failed += 1
+            print(f"FAIL {name}: {got!r} still holds {bad}")
+        else:
+            print(f"ok   {name}")
+    unrelated = "[18:05:56] DEBUG dial error tcp4 127.0.0.1:4001: connection refused 12D3KooWAKXRhSL1UtDoCc1P5"
+    if scrub_line(unrelated, windows) != unrelated:
+        failed += 1
+        print(f"FAIL unrelated text changed: {scrub_line(unrelated, windows)!r}")
+    else:
+        print("ok   unrelated text unchanged")
+    raw = b"bad \xff\xfe byte " + token.encode() + b"\nnext line\n"
+    out = io.StringIO()
+    try:
+        scrub_stream(io.BytesIO(raw), out, windows)
+        got = out.getvalue()
+    except Exception as e:  # noqa: BLE001 - the case is that nothing raises
+        got = f"raised {e!r}"
+    if token in got or PLACEHOLDER not in got or not got.endswith("next line\n"):
+        failed += 1
+        print(f"FAIL input that is not UTF-8: {got!r}")
+    else:
+        print("ok   input that is not UTF-8")
+    if secrets_of("") != [""] or windows_of(secrets_of("")):
+        failed += 1
+        print("FAIL an empty token yields windows")
+    else:
+        print("ok   empty token yields no windows")
+    return 1 if failed else 0
+
+
+def main(argv):
+    if argv[1:] == ["--self-test"]:
+        return self_test()
+    if len(argv) != 2:
+        print(__doc__.strip().splitlines()[2], file=sys.stderr)
+        return 2
+    try:
+        with open(argv[1]) as f:
+            token = f.read().strip()
+    except OSError:
+        token = ""
+    windows = windows_of(secrets_of(token)) if token else set()
+    if not windows:
+        print("scrub-key: no key to scrub with, refusing to copy the text", file=sys.stderr)
+        return 2
+    scrub_stream(sys.stdin.buffer, sys.stdout, windows)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

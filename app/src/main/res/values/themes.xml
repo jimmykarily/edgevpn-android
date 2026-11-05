@@ -1,8 +1,133 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.EdgeVPN" parent="Theme.MaterialComponents.Light.DarkActionBar">
-        <item name="colorPrimary">#1976D2</item>
-        <item name="colorPrimaryVariant">#1565C0</item>
+    <style name="Theme.EdgeVPN.Base" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/teal</item>
         <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#CCFBF1</item>
+        <item name="colorOnPrimaryContainer">#134E4A</item>
+        <item name="android:colorBackground">@color/screen_bg</item>
+        <item name="colorSurface">@color/screen_bg</item>
+        <item name="android:statusBarColor">@color/screen_bg</item>
+        <item name="android:navigationBarColor">@color/screen_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.EdgeVPN.BottomSheetDialog</item>
+    </style>
+
+    <style name="Theme.EdgeVPN" parent="Theme.EdgeVPN.Base" />
+
+    <style name="ThemeOverlay.EdgeVPN.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.EdgeVPN.BottomSheet</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/card_bg</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.Toolbar" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.Section" parent="">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/text_muted</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.Legend" parent="">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/text_muted</item>
+        <item name="android:drawablePadding">5dp</item>
+        <item name="android:gravity">center_vertical</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.Pill" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/bg_pill</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.WhiteCard" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/card_bg</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">1dp</item>
+        <!-- Room for the shadow inside the parent, which clips its children. -->
+        <item name="android:layout_marginBottom">3dp</item>
+    </style>
+    <!-- Settings rows: an icon in a tinted square, a title with a line under it, and a value or control. -->
+    <style name="Widget.EdgeVPN.SettingsRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:minHeight">64dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingBottom">12dp</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.SettingsIcon" parent="">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginEnd">14dp</item>
+        <item name="android:background">@drawable/bg_settings_icon</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/network_end</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.SettingsText" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.RowTitle" parent="">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text_main</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.RowSub" parent="">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/text_muted</item>
+        <item name="android:lineSpacingMultiplier">1.1</item>
+    </style>
+
+    <style name="TextAppearance.EdgeVPN.RowValue" parent="">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/teal</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.SettingsDivider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:layout_marginStart">64dp</item>
+        <item name="android:background">@color/divider</item>
+    </style>
+
+    <style name="Widget.EdgeVPN.CardButton" parent="Widget.Material3.Button">
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">40dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="backgroundTint">@color/on_card_button</item>
+        <item name="cornerRadius">999dp</item>
+        <item name="rippleColor">#33FFFFFF</item>
     </style>
 </resources>

@@ -48,9 +48,72 @@ make install      # build + push APK to USB-connected device
 | `make app` | Build the Android debug APK |
 | `make preview` | Build the preview APK (`com.kairos.edgevpn.preview`, installs next to a release) |
 | `make release` | Build the release APK (signed only when the signing variables below are set) |
+| `make test` | Run the scrub-key self-test, the Go tests and the app's JVM unit tests |
+| `make lint` | Run Android lint on the debug build; fails on errors, warnings go to `app/build/reports/` |
 | `make install` | Build + install APK on USB-connected device via adb |
 | `make clean` | Remove build outputs |
 | `make distclean` | Remove build outputs and all downloaded tools (`binaries/`) |
+
+The **Unit tests** workflow (`.github/workflows/test.yml`) runs `make test` and `make lint` on every pull request and every push to `main`. It needs no device and no secrets.
+
+## Emulator
+
+A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the preview app without a phone. It uses the emulator and the Android 35 system image from `~/Android/Sdk` (override with `EDGEVPN_EMULATOR_SDK`) and this repo's own adb. The port can be changed with `EDGEVPN_AVD_PORT`.
+
+| Target | Description |
+|--------|-------------|
+| `make emu-setup` | Install the emulator and system image, create the AVD (once) |
+| `make emu-up` / `make emu-down` / `make emu-status` | Start headless and wait for boot, stop (saves a snapshot), report state |
+| `make emu-run` | Build the preview APK with the emulator architecture, install and launch it |
+| `make emu-shot` | Write `screenshot.png` |
+| `make e2e` | Run the screen tests on the emulator (see below) |
+| `make network-test` | Run the real-network check against the test peer (see below) |
+
+`scripts/emulator` has more commands: `up-windowed`, `reset`, `install`, `launch`, `stop-app`, `shot [file]`, `ui` (view hierarchy as text; the text of editable fields is redacted to its length) and `logs`. The emulator reaches the internet through the host's NAT, never the host's local network.
+
+The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `android/arm64`, which is what phones and CI need). `make emu-run` sets it to `android/arm64,android/amd64`. Changing the value rebuilds the AAR, so building again with a different value takes a full gomobile bind.
+
+## Screen tests
+
+The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
+
+```bash
+make emu-up   # start the emulator, once
+make e2e      # build with android/amd64 added and run the tests on emulator-5556
+```
+
+`make e2e` runs `connectedDebugAndroidTest` on the device named by `ANDROID_SERIAL` (default `emulator-5556`) and turns off its animations first. It installs the debug build, `com.kairos.edgevpn`. Results are in `app/build/reports/androidTests/connected/`. The tests clear the debug app's stored settings, network key included, and Gradle uninstalls the app when they finish, so do not point `ANDROID_SERIAL` at a phone whose debug app you want to keep.
+
+The **E2E tests** workflow (`.github/workflows/e2e.yml`) runs the same target on every pull request and every push to `main`, on an API 35 x86_64 emulator, and uploads the reports when a test fails. It uses no secrets.
+
+## Test peer
+
+Real-network checks need a second device in the network. `scripts/testpeer` runs one: a disposable QEMU VM (Debian 12 cloud image, KVM, 512 MB, headless) with edgevpn inside, at VPN address `10.1.0.10`. It needs `qemu-system-x86_64`, `qemu-img`, `xorriso`, `ssh` and a usable `/dev/kvm`, and no root: the VM uses QEMU user-mode networking.
+
+| Target | Description |
+|--------|-------------|
+| `make peer-up` | Start the VM with a new temporary network key and wait until edgevpn is up |
+| `make peer-down` | Stop the VM and delete the run directory, including the key |
+| `make peer-status` | Whether the VM and edgevpn are running, and the VPN interface |
+
+`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `serial` (its console log), `scrub` (stdin to stdout without the key), `key` (the path of the key file, never its contents) and `addr` (the VM's libp2p address as the emulator reaches it).
+
+The first `up` downloads the cloud image and builds edgevpn at the version `golib/go.mod` requires, both into `binaries/testpeer/`. Each run boots from a fresh overlay disk and generates its own key into `binaries/testpeer/run/token`; the owner's network key is never used. edgevpn in the VM runs with an ownership TTL of 60 seconds instead of the default 8 minutes, so it forgets a device that has been silent for about a minute. The host forwards `127.0.0.1:40022` to the VM's SSH and `127.0.0.1:40001` to its libp2p port (override with `TESTPEER_SSH_PORT` and `TESTPEER_P2P_PORT`).
+
+## Network test
+
+`make network-test` checks the app on a real network: the debug app on the emulator joins the test peer's network, both sides ping each other, and the VPN is turned off for 90 seconds (longer than the peer's ownership TTL, so the peer drops the app from its machine list) and on again, after which pings must work again and the app must still have exactly two listening sockets. That last part guards against an old libp2p host staying alive after the VPN stops.
+
+```bash
+make emu-up         # start the emulator, once
+make network-test   # build, start the peer if needed, run the check
+```
+
+The script, `scripts/network-test`, stores the peer's temporary key, the address `10.1.0.4` and the peer's libp2p address in the app through an instrumented helper (`NetworkTestSetup`), grants the VPN permission with `appops`, and drives the main screen through `adb`. The app dials the peer directly at `10.0.2.2` (the host as the emulator sees it) instead of looking for it through the public DHT, so it connects in seconds. Because the peer forgets a device after 60 seconds without a heartbeat, the test also makes the app send one every 15 seconds instead of every 120. Neither setting has a screen in the app.
+
+It writes screenshots, the app's log and the peer's edgevpn and console logs into `build/network-test/`. Every log it shows or writes (not the screenshots) goes through `scripts/scrub-key` first, which removes the key, the secrets inside it and any 12-character piece of either, and which prints nothing if it has no key to scrub with (`make test` runs its self-test). Screenshots are not scrubbed. They show only the app's screens for this run's throwaway key, and the Join screen, the one screen a key can be typed into, blocks screenshots. It clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
+
+The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
 
 ## Auto-downloaded tools
 

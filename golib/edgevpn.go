@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -17,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/mudler/edgevpn/pkg/config"
 	"github.com/mudler/edgevpn/pkg/node"
+	"github.com/mudler/edgevpn/pkg/services"
 	"github.com/mudler/edgevpn/pkg/vpn"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -41,7 +43,6 @@ var (
 	mu       sync.Mutex
 	cancelFn context.CancelFunc
 	tunFile  *os.File
-	vpnState = "disconnected"
 )
 
 // GenerateNodeKey returns a new Ed25519 private key in libp2p's marshaled
@@ -65,21 +66,26 @@ func GenerateNodeKey() ([]byte, error) {
 // CLI fills most of these fields from its flag defaults (cmd/util.go), and the
 // library's zero values differ from those defaults in ways that break
 // interoperation with CLI nodes, so every value the CLI sets is set here too.
-func networkConfig(token string) config.Config {
+func networkConfig(token, address string) config.Config {
+	logLevel, libp2pLogLevel := "info", "error"
+	if DetailedLogs() {
+		logLevel, libp2pLogLevel = "debug", "debug"
+	}
 	return config.Config{
 		NetworkToken:   token,
-		Address:        "10.1.0.2/24",
+		Address:        address + "/24",
 		BootstrapIface: false,
 		LowProfile:     true,
 		Concurrency:    1,
 		PacketMTU:      1500,
 		InterfaceMTU:   1500,
 		FrameTimeout:   "15s",
-		LogLevel:       "debug",
-		Libp2pLogLevel: "debug",
+		LogLevel:       logLevel,
+		Libp2pLogLevel: libp2pLogLevel,
 		Discovery: config.Discovery{
-			DHT:  true,
-			MDNS: true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
+			DHT:            true,
+			MDNS:           true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
+			BootstrapPeers: bootstrapPeers(),
 		},
 		// Match the CLI defaults (cmd/util.go: autorelay=true, holepunch=true).
 		// These are essential for NAT traversal when both peers are behind NAT:
@@ -115,18 +121,29 @@ func networkConfig(token string) config.Config {
 // Start initialises the VPN with a TUN file descriptor, a base64-encoded
 // EdgeVPN token and the node key from GenerateNodeKey. The fd must come from
 // Android's VpnService.Builder.establish(); Start takes ownership of it and
-// closes it on failure. This function returns immediately; the VPN runs in a
+// closes it on failure. The address is this device's VPN address without a
+// prefix length, such as "10.1.0.2", and the name is how this device is
+// shown to the user. This function returns immediately; the VPN runs in a
 // background goroutine.
-func Start(fd int, token string, nodeKey []byte) error {
+func Start(fd int, token string, nodeKey []byte, address string, name string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
 	if cancelFn != nil {
+		// The caller handed over ownership of fd, so a rejected start closes it.
+		syscall.Close(fd)
 		return fmt.Errorf("already running")
 	}
 
+	lastFailure = ""
+	failureDetail = ""
+	failedAt = time.Time{}
+	selfAddress = address
+	selfName = name
+
 	tunFile = os.NewFile(uintptr(fd), "tun")
 	if tunFile == nil {
+		fail(reasonStart, fmt.Sprintf("invalid file descriptor: %d", fd))
 		return fmt.Errorf("invalid file descriptor: %d", fd)
 	}
 
@@ -137,19 +154,25 @@ func Start(fd int, token string, nodeKey []byte) error {
 	nodeKey = append([]byte(nil), nodeKey...)
 	if _, err := crypto.UnmarshalPrivateKey(nodeKey); err != nil {
 		closeTunOnError("invalid node key")
+		failWithoutDetail(reasonKey, fmt.Sprintf("invalid node key: %v", err))
 		return fmt.Errorf("invalid node key: %w", err)
 	}
 
 	llger := &bufferLogger{}
-	cfg := networkConfig(token)
+	cfg := networkConfig(normalizeToken(token), address)
 
 	SetMinLogLevel(cfg.LogLevel)
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
 		closeTunOnError("config error")
+		failWithoutDetail(reasonKey, fmt.Sprintf("config error: %v", err))
 		return fmt.Errorf("config error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
+	// The Alive options must come before the VPN service options: the VPN
+	// service blocks in its packet loop, so services after it never start.
+	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
+	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService))
 
 	// Inject a protected TCP transport so every socket fd is passed through
 	// VpnService.protect() before connect/bind. This prevents the VPN's own
@@ -214,6 +237,7 @@ func Start(fd int, token string, nodeKey []byte) error {
 	vpnNodeOpts, err := vpn.Register(vpnOpts...)
 	if err != nil {
 		closeTunOnError("vpn register error")
+		fail(reasonStart, fmt.Sprintf("vpn register error: %v", err))
 		return fmt.Errorf("vpn register error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, vpnNodeOpts...)
@@ -221,30 +245,53 @@ func Start(fd int, token string, nodeKey []byte) error {
 	n, err := node.New(nodeOpts...)
 	if err != nil {
 		closeTunOnError("node create error")
+		failWithoutDetail(reasonStart, fmt.Sprintf("node create error: %v", err))
 		return fmt.Errorf("node create error: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancelFn = cancel
-	vpnState = "connecting"
+	currentNode = n
+	hostReady = false
+	startedAt = time.Now()
 
 	go func() {
 		emit("INFO ", "node.Start: entering (blocks in VPN service readPackets loop)")
 		err := n.Start(ctx)
-		mu.Lock()
-		defer mu.Unlock()
-		cancelFn = nil
-		if err != nil && ctx.Err() == nil {
-			emit("ERROR", fmt.Sprintf("node.Start returned error: %v", err))
-			vpnState = "error: " + err.Error()
-		} else {
+		if err == nil || ctx.Err() != nil {
 			emit("INFO ", "node.Start returned cleanly (context cancelled)")
-			vpnState = "disconnected"
+			return
 		}
+		handleNodeExit(n, cancel, err)
 	}()
 
-	vpnState = "connected"
 	return nil
+}
+
+// handleNodeExit deals with node n stopping on its own with err. It always
+// cancels n's context and closes n's host so the node's background work ends.
+// It runs on the goroutine that ran n.Start, so reading n's host is safe even
+// when the host was never marked ready. Only when n is still the current
+// session does it release the tunnel, record the failure and tell the
+// listener; a stale exit must not disturb a newer session.
+func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
+	cancel()
+	closeNodeHost(n)
+	mu.Lock()
+	current := currentNode == n
+	if current {
+		if tunFile != nil {
+			closeTunOnError("node failure")
+		}
+		currentNode = nil
+		cancelFn = nil
+		hostReady = false
+		fail(reasonStopped, fmt.Sprintf("node.Start returned error: %v", err))
+	}
+	mu.Unlock()
+	if current {
+		notifyStopped(err.Error())
+	}
 }
 
 // closeTunOnError closes the TUN file when Start fails after taking it over,
@@ -257,29 +304,47 @@ func closeTunOnError(reason string) {
 	tunFile = nil
 }
 
-// Stop shuts down the VPN and closes the TUN file descriptor.
-// Closing the fd tells Android the VPN interface is gone so it tears down routing.
+// Stop shuts down the VPN, closes the TUN file descriptor and starts closing
+// the libp2p host. Closing the fd tells Android the VPN interface is gone so
+// it tears down routing. The host is closed only when it was marked ready; a
+// session stopped earlier closes its own host in hostReadyService.
+//
+// Stop returns without waiting for the host to close. The app calls Stop on
+// its main thread, and closing the host waits for dials in progress, each of
+// which protects its socket through the main thread.
 func Stop() {
 	mu.Lock()
-	defer mu.Unlock()
+	var hostToClose *node.Node
+	if hostReady {
+		hostToClose = currentNode
+	}
 	if cancelFn != nil {
 		cancelFn()
 		cancelFn = nil
 	}
+	lastFailure = ""
+	failureDetail = ""
+	failedAt = time.Time{}
+	currentNode = nil
+	startedAt = time.Time{}
+	hostReady = false
+	selfAddress = ""
+	selfName = ""
 	if tunFile != nil {
 		if err := tunFile.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			emit("WARN ", fmt.Sprintf("failed to close tun file in Stop(): %v", err))
 		}
 		tunFile = nil
 	}
-	vpnState = "disconnected"
+	mu.Unlock()
+	if hostToClose != nil {
+		go closeHost(hostOf(hostToClose))
+	}
 }
 
-// Status returns the current VPN status as a string.
+// Status returns "off", "looking", "connected" or "problem".
 func Status() string {
-	mu.Lock()
-	defer mu.Unlock()
-	return vpnState
+	return collectSnapshot().State
 }
 
 // androidAddrsFactory replaces unspecified listen addresses (0.0.0.0, ::)
