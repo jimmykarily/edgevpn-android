@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">EdgeVPN</string>
-    <string name="connect">Connect</string>
-    <string name="disconnect">Disconnect</string>
-    <string name="no_token_message">No token configured. Set one in settings to connect.</string>
-    <string name="open_settings">Settings</string>
+
+    <!-- Settings (token) -->
     <string name="settings_title">Settings</string>
     <string name="token_hint">Paste EdgeVPN token</string>
     <string name="save_token">Save token</string>
@@ -13,6 +11,79 @@
     <string name="token_deleted">Token deleted</string>
     <string name="token_empty_error">Token cannot be empty</string>
     <string name="token_configured">Token is configured</string>
-    <string name="show_logs">Show logs</string>
-    <string name="hide_logs">Hide logs</string>
+
+    <!-- Main screen: menu -->
+    <string name="menu_settings">Settings</string>
+    <string name="menu_logs">Logs</string>
+    <string name="logs_coming">Logs are coming in a later update</string>
+
+    <!-- Main screen: status card -->
+    <string name="state_off_title">VPN is off</string>
+    <string name="state_off_text">Your devices can\'t reach this phone, and it can\'t reach them.</string>
+    <string name="state_looking_title">Looking for your devices</string>
+    <string name="state_looking_text">This can take up to a few minutes on mobile data.</string>
+    <string name="state_looking_text_started">Started %1$s. This can take up to a few minutes on mobile data.</string>
+    <string name="state_connected_title">Connected</string>
+    <plurals name="state_connected_text">
+        <item quantity="one">You can reach %1$d of your %2$d device.</item>
+        <item quantity="other">You can reach %1$d of your %2$d devices.</item>
+    </plurals>
+    <string name="state_problem_title">The VPN stopped</string>
+    <string name="state_problem_text">Something went wrong while starting the VPN.</string>
+    <string name="button_turn_on">Turn on</string>
+    <string name="button_turn_off">Turn off</string>
+    <string name="button_try_again">Try again</string>
+    <string name="button_see_logs">See logs</string>
+    <string name="pill_this_phone">This phone</string>
+    <string name="pill_using">Using</string>
+    <string name="using_wifi">Wi-Fi</string>
+    <string name="using_mobile_data">Mobile data</string>
+    <string name="using_other">Other</string>
+    <string name="using_none">No connection</string>
+    <string name="vpn_permission_denied">The VPN needs your permission to start.</string>
+
+    <!-- Main screen: sections -->
+    <string name="map_description">Map of your devices</string>
+    <string name="section_devices">Your devices</string>
+    <string name="section_finding">Finding your devices</string>
+    <plurals name="tile_helpers">
+        <item quantity="one">public helper available</item>
+        <item quantity="other">public helpers available</item>
+    </plurals>
+    <plurals name="tile_found">
+        <item quantity="one">device found so far</item>
+        <item quantity="other">devices found so far</item>
+    </plurals>
+    <string name="tile_last_heard">last heard from your network</string>
+
+    <!-- Devices -->
+    <string name="unnamed_device">Unnamed device</string>
+    <string name="device_line">%1$s · %2$s</string>
+    <string name="badge_direct">Direct</string>
+    <string name="badge_via_helper">Via helper</string>
+    <string name="badge_offline">Offline</string>
+    <string name="how_same_wifi">same Wi-Fi as you</string>
+    <string name="how_over_internet">over the internet</string>
+    <string name="how_through_helper">through a helper computer</string>
+    <string name="how_last_seen">last seen %1$s</string>
+    <string name="how_not_reachable">not reachable right now</string>
+
+    <!-- Relative times -->
+    <string name="ago_just_now">just now</string>
+    <string name="ago_seconds">%1$d s ago</string>
+    <string name="ago_minutes">%1$d min ago</string>
+    <string name="ago_hours">%1$d h ago</string>
+    <plurals name="ago_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+
+    <!-- Device sheet -->
+    <string name="sheet_address">Address in your network</string>
+    <string name="sheet_how">How it is reached</string>
+    <string name="sheet_remote">Connected to</string>
+    <string name="sheet_transport">Connection type</string>
+    <string name="sheet_id">Device ID</string>
+    <string name="sheet_copy">Copy device ID</string>
+    <string name="sheet_copied">Device ID copied</string>
 </resources>
