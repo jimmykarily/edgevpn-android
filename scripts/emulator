@@ -206,7 +206,7 @@ def redact(m):
     node = m.group(0)
     if "class=\"android.widget.EditText\"" not in node and "password=\"true\"" not in node:
         return node
-    return re.sub(r"\btext=\"([^\"]*)\"", lambda t: "text=\"<redacted, %d chars>\"" % len(t.group(1)), node, count=1)
+    return re.sub(r"\btext=\"([^\"]*)\"", lambda t: "text=\"redacted (%d chars)\"" % len(t.group(1)), node, count=1)
 sys.stdout.write(re.sub(r"<node [^>]*>", redact, xml))
 '
     "$ADB" -s "$SERIAL" shell rm -f /sdcard/ui.xml
