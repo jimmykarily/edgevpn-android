@@ -15,7 +15,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import edgevpn.Edgevpn
-import edgevpn.LogReceiver
 
 class MainActivity : AppCompatActivity() {
 
@@ -29,22 +28,6 @@ class MainActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var logsVisible = false
-
-    private val logReceiver = object : LogReceiver {
-        override fun onLog(line: String?) {
-            if (line != null) {
-                // Send to logcat so "make logs" shows the same as the in-app log viewer
-                Log.i(LOG_TAG, line.trim())
-            }
-            handler.post {
-                if (logsVisible && line != null) {
-                    logText.append(line)
-                    logText.append("\n")
-                    logScrollView.post { logScrollView.fullScroll(View.FOCUS_DOWN) }
-                }
-            }
-        }
-    }
 
     companion object {
         private const val LOG_TAG = "EdgeVPN"
@@ -86,6 +69,10 @@ class MainActivity : AppCompatActivity() {
         toggleLogsButton.setOnClickListener {
             logsVisible = !logsVisible
             logScrollView.visibility = if (logsVisible) View.VISIBLE else View.GONE
+            if (logsVisible) {
+                logText.text = Edgevpn.recentLogs()
+                logScrollView.post { logScrollView.fullScroll(View.FOCUS_DOWN) }
+            }
             toggleLogsButton.text = getString(
                 if (logsVisible) R.string.hide_logs else R.string.show_logs
             )
@@ -95,12 +82,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateView()
-        Edgevpn.setLogReceiver(logReceiver)
     }
 
     override fun onPause() {
         super.onPause()
-        Edgevpn.setLogReceiver(null)
     }
 
     private fun openSettings() {

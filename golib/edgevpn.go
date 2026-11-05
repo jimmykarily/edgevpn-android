@@ -66,6 +66,10 @@ func GenerateNodeKey() ([]byte, error) {
 // library's zero values differ from those defaults in ways that break
 // interoperation with CLI nodes, so every value the CLI sets is set here too.
 func networkConfig(token, address string) config.Config {
+	logLevel, libp2pLogLevel := "info", "error"
+	if DetailedLogs() {
+		logLevel, libp2pLogLevel = "debug", "debug"
+	}
 	return config.Config{
 		NetworkToken:   token,
 		Address:        address + "/24",
@@ -75,8 +79,8 @@ func networkConfig(token, address string) config.Config {
 		PacketMTU:      1500,
 		InterfaceMTU:   1500,
 		FrameTimeout:   "15s",
-		LogLevel:       "debug",
-		Libp2pLogLevel: "debug",
+		LogLevel:       logLevel,
+		Libp2pLogLevel: libp2pLogLevel,
 		Discovery: config.Discovery{
 			DHT:  true,
 			MDNS: true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
