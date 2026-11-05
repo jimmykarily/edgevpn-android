@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+#
+# Runs a disposable QEMU virtual machine with an edgevpn node in it, as the
+# second device for real-network checks on the emulator.
+#
+# The VM joins a network made from a temporary key that this script
+# generates for each run and deletes on "down". The key is written to a file
+# and never printed. The VM uses QEMU user-mode networking, so it needs no
+# root on the host: it reaches the internet through QEMU's NAT, and two host
+# ports on 127.0.0.1 are forwarded into it, one for SSH and one for libp2p.
+# The Android emulator reaches the host's 127.0.0.1 as 10.0.2.2, so the
+# app can dial the VM's libp2p port directly (see the "addr" command).
+#
+# Inside the VM, edgevpn runs as root with the VPN address 10.1.0.10 and a
+# short ownership TTL of 60 seconds, so it forgets a device that has been
+# silent for about a minute instead of the default eight.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BIN_DIR="$ROOT/binaries/testpeer"
+RUN_DIR="$BIN_DIR/run"
+
+# A dated Debian release rather than "latest", so the checksum below stays
+# valid and CI can cache the image under a fixed key.
+IMAGE_RELEASE="20261026-2643"
+IMAGE_NAME="debian-12-genericcloud-amd64-$IMAGE_RELEASE.qcow2"
+IMAGE_URL="https://cloud.debian.org/images/cloud/bookworm/$IMAGE_RELEASE/$IMAGE_NAME"
+IMAGE_SHA512="0464b5d4ae3aa4f658468d88da83af7857b71548b30d46dcb6282770955a747fb95a983476db90d25afd0653af607224c7ebd05122ab71faa106fd712aaad652"
+IMAGE="$BIN_DIR/$IMAGE_NAME"
+
+# The edgevpn version the app's Go library is built against.
+EDGEVPN_VERSION="$(cd "$ROOT/golib" && go list -m -f '{{.Version}}' github.com/mudler/edgevpn)"
+EDGEVPN="$BIN_DIR/edgevpn-$EDGEVPN_VERSION"
+
+SSH_PORT="${TESTPEER_SSH_PORT:-40022}"
+P2P_PORT="${TESTPEER_P2P_PORT:-40001}"
+VPN_ADDRESS="10.1.0.10"
+OWNERSHIP_TTL=60
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/edgevpn-testpeer"
+PID_FILE="$STATE_DIR/qemu.pid"
+SERIAL_LOG="$STATE_DIR/serial.log"
+
+TOKEN_FILE="$RUN_DIR/token"
+SSH_KEY="$RUN_DIR/ssh_key"
+
+# A cold boot of the cloud image with KVM takes well under a minute; the
+# first boot also runs cloud-init.
+BOOT_TIMEOUT_SECONDS="${TESTPEER_BOOT_TIMEOUT:-180}"
+
+die() {
+    echo "testpeer: $*" >&2
+    exit 1
+}
+
+running() {
+    [ -f "$PID_FILE" ] || return 1
+    local pid
+    pid=$(cat "$PID_FILE")
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+vm() {
+    [ -f "$SSH_KEY" ] || die "no SSH key for this run. Run: scripts/testpeer up"
+    ssh -i "$SSH_KEY" -p "$SSH_PORT" \
+        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR -o BatchMode=yes -o ConnectTimeout=5 \
+        tester@127.0.0.1 "$@"
+}
+
+ensure_image() {
+    [ -f "$IMAGE" ] && return 0
+    mkdir -p "$BIN_DIR"
+    echo "==> Downloading $IMAGE_NAME"
+    curl -fsSL -o "$IMAGE.part" "$IMAGE_URL"
+    echo "$IMAGE_SHA512  $IMAGE.part" | sha512sum -c --quiet - || {
+        rm -f "$IMAGE.part"
+        die "checksum mismatch for $IMAGE_NAME"
+    }
+    mv "$IMAGE.part" "$IMAGE"
+}
+
+# A static Linux binary of the module version itself. edgevpn's go.mod has a
+# replace directive, which "go install pkg@version" refuses, so the module
+# source is copied out of the module cache and built there. The web UI it
+# embeds is not part of the module download, and the VM does not serve it,
+# so an empty page stands in for it.
+ensure_edgevpn() {
+    [ -x "$EDGEVPN" ] && return 0
+    echo "==> Building edgevpn $EDGEVPN_VERSION for the VM"
+    local src build
+    src=$(cd "$ROOT/golib" && go mod download -json "github.com/mudler/edgevpn@$EDGEVPN_VERSION" |
+        python3 -I -c 'import json, sys; print(json.load(sys.stdin)["Dir"])')
+    build="$BIN_DIR/src-$EDGEVPN_VERSION"
+    rm -rf "$build"
+    cp -r "$src" "$build"
+    chmod -R u+w "$build"
+    mkdir -p "$build/api/react-ui/dist"
+    echo "<!doctype html>" >"$build/api/react-ui/dist/index.html"
+    (cd "$build" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+        go build -trimpath -ldflags="-s -w" -o "$EDGEVPN.part" .)
+    mv "$EDGEVPN.part" "$EDGEVPN"
+    rm -rf "$build"
+}
+
+# The temporary network key, made once per run with the same edgevpn the VM
+# runs. Only its path is ever shown.
+ensure_token() {
+    [ -s "$TOKEN_FILE" ] && return 0
+    (umask 077 && "$EDGEVPN" -g -b | tr -d '\n' >"$TOKEN_FILE")
+    [ -s "$TOKEN_FILE" ] || die "could not generate a network key"
+}
+
+write_seed() {
+    local seed="$RUN_DIR/seed"
+    rm -rf "$seed"
+    (umask 077 && mkdir -p "$seed")
+    cp "$EDGEVPN" "$seed/edgevpn"
+    (umask 077 && printf 'EDGEVPNTOKEN=%s\n' "$(cat "$TOKEN_FILE")" >"$seed/env")
+    echo "instance-id: edgevpn-testpeer-$(date +%s)" >"$seed/meta-data"
+    echo "local-hostname: testpeer" >>"$seed/meta-data"
+
+    # The aliveness intervals sit well inside the 60 second ownership TTL,
+    # so the VM's own heartbeat never lapses while it is up.
+    cat >"$seed/user-data" <<EOF
+#cloud-config
+users:
+  - name: tester
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - $(cat "$SSH_KEY.pub")
+write_files:
+  - path: /etc/systemd/system/edgevpn.service
+    content: |
+      [Unit]
+      Description=edgevpn test peer
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      EnvironmentFile=/etc/edgevpn/env
+      ExecStart=/usr/local/bin/edgevpn --address $VPN_ADDRESS/24 --log-level debug --privkey-cache --privkey-cache-dir /var/lib/edgevpn --ownership-ttl $OWNERSHIP_TTL --aliveness-healthcheck-interval 15 --aliveness-healthcheck-scrub-interval 30 --aliveness-healthcheck-max-interval 45 --listen-maddrs /ip4/0.0.0.0/tcp/4001
+      StandardOutput=append:/var/log/edgevpn.log
+      StandardError=append:/var/log/edgevpn.log
+      Restart=on-failure
+runcmd:
+  - mkdir -p /mnt/seed /etc/edgevpn /var/lib/edgevpn
+  - mount -o ro /dev/disk/by-label/cidata /mnt/seed
+  - install -m 755 /mnt/seed/edgevpn /usr/local/bin/edgevpn
+  - install -m 600 /mnt/seed/env /etc/edgevpn/env
+  - umount /mnt/seed
+  - systemctl daemon-reload
+  - systemctl start edgevpn
+EOF
+    (umask 077 && xorriso -as mkisofs -quiet -output "$RUN_DIR/seed.iso" \
+        -volid cidata -joliet -rock "$seed" >/dev/null 2>&1) || die "could not make the seed ISO"
+    rm -rf "$seed"
+}
+
+# The VM's libp2p identity, read from the line edgevpn logs at start.
+node_id() {
+    vm "sudo grep -m1 -o 'Node ID: *[A-Za-z0-9]*' /var/log/edgevpn.log 2>/dev/null" | sed 's/^Node ID: *//'
+}
+
+edgevpn_up() {
+    vm "ip -4 addr show edgevpn0 2>/dev/null | grep -q 'inet $VPN_ADDRESS/'" 2>/dev/null &&
+        [ -n "$(node_id 2>/dev/null)" ]
+}
+
+cmd_up() {
+    if running; then
+        edgevpn_up || die "the VM is running but edgevpn is not up. See: scripts/testpeer logs"
+        echo "already running"
+        return 0
+    fi
+    command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 is not installed"
+    command -v xorriso >/dev/null || die "xorriso is not installed"
+    [ -w /dev/kvm ] || die "/dev/kvm is not usable by this user"
+
+    ensure_image
+    ensure_edgevpn
+
+    rm -rf "$RUN_DIR"
+    (umask 077 && mkdir -p "$RUN_DIR" "$STATE_DIR")
+    ensure_token
+    ssh-keygen -q -t ed25519 -N "" -C testpeer -f "$SSH_KEY"
+    write_seed
+    qemu-img create -q -f qcow2 -F qcow2 -b "$IMAGE" "$RUN_DIR/disk.qcow2" 4G
+
+    rm -f "$SERIAL_LOG"
+    qemu-system-x86_64 \
+        -name edgevpn-testpeer \
+        -enable-kvm -cpu host -m 512 -smp 1 \
+        -display none -daemonize -pidfile "$PID_FILE" \
+        -serial "file:$SERIAL_LOG" \
+        -drive "file=$RUN_DIR/disk.qcow2,if=virtio" \
+        -drive "file=$RUN_DIR/seed.iso,media=cdrom,readonly=on" \
+        -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22,hostfwd=tcp:127.0.0.1:$P2P_PORT-:4001" \
+        -device virtio-net-pci,netdev=net0
+
+    local waited=0
+    while ! edgevpn_up; do
+        running || die "the VM exited during boot. See $SERIAL_LOG"
+        [ "$waited" -lt "$BOOT_TIMEOUT_SECONDS" ] || die "edgevpn not up after ${BOOT_TIMEOUT_SECONDS}s. See $SERIAL_LOG"
+        sleep 3
+        waited=$((waited + 3))
+    done
+    echo "peer up at $VPN_ADDRESS after about ${waited}s"
+}
+
+cmd_down() {
+    if running; then
+        kill "$(cat "$PID_FILE")" 2>/dev/null || true
+        local waited=0
+        while running && [ "$waited" -lt 20 ]; do
+            sleep 1
+            waited=$((waited + 1))
+        done
+        running && kill -9 "$(cat "$PID_FILE")" 2>/dev/null || true
+    fi
+    rm -rf "$RUN_DIR" "$STATE_DIR"
+    echo "peer down, temporary key deleted"
+}
+
+cmd_status() {
+    if ! running; then
+        echo "stopped"
+        return 1
+    fi
+    echo "VM running (pid $(cat "$PID_FILE"))"
+    if ! vm true 2>/dev/null; then
+        echo "SSH not answering yet"
+        return 1
+    fi
+    echo "edgevpn service: $(vm systemctl is-active edgevpn 2>/dev/null || true)"
+    vm "ip -4 addr show edgevpn0" 2>/dev/null || echo "no edgevpn0 interface"
+    echo "node: $(node_id)"
+}
+
+cmd_ping() {
+    [ -n "${1:-}" ] || die "usage: scripts/testpeer ping <address>"
+    vm ping -c 3 -W 2 "$1"
+}
+
+cmd_logs() {
+    vm sudo cat /var/log/edgevpn.log
+}
+
+cmd_key() {
+    [ -s "$TOKEN_FILE" ] || die "no key for this run. Run: scripts/testpeer up"
+    echo "$TOKEN_FILE"
+}
+
+# The VM's libp2p address as the emulator reaches it.
+cmd_addr() {
+    local id
+    id=$(node_id)
+    [ -n "$id" ] || die "edgevpn has not logged its node ID yet"
+    echo "/ip4/10.0.2.2/tcp/$P2P_PORT/p2p/$id"
+}
+
+usage() {
+    cat <<'USAGE'
+usage: scripts/testpeer <command>
+
+  up            start the VM with a new temporary key and wait for edgevpn
+  down          stop the VM and delete the run, including the key
+  status        whether the VM and edgevpn are up, and the VPN interface
+  ping <addr>   ping an address from inside the VM
+  logs          the VM's edgevpn log
+  key           the path of the temporary key file (never its contents)
+  addr          the VM's libp2p address as seen from the Android emulator
+USAGE
+}
+
+case "${1:-}" in
+    up) cmd_up ;;
+    down) cmd_down ;;
+    status) cmd_status ;;
+    ping) cmd_ping "${2:-}" ;;
+    logs) cmd_logs ;;
+    key) cmd_key ;;
+    addr) cmd_addr ;;
+    *) usage; exit 1 ;;
+esac
