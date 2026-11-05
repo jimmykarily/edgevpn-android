@@ -135,7 +135,9 @@ jobs:
           tail -n 60 build/network-test/testpeer-serial.log
 
       # The app's log, the VM's edgevpn and console logs and the screenshots.
-      # The key is replaced with a placeholder wherever it shows up.
+      # The logs have the key replaced with a placeholder wherever it shows
+      # up. The screenshots are not scrubbed; they show only the app's
+      # screens for this run's throwaway key.
       - name: Upload the logs
         if: failure()
         uses: actions/upload-artifact@v7
