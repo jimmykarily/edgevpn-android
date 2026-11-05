@@ -162,7 +162,7 @@
     <string name="help_off_tech">No edgevpn node is running and no VPN interface exists.</string>
     <string name="help_problem_title">The VPN could not run</string>
     <string name="help_problem_plain">The VPN could not start, or stopped because of an error.</string>
-    <string name="help_problem_tech">The exact error, as returned by the step that failed.</string>
+    <string name="help_problem_tech">Error details is the exact error, as returned by the step that failed. It is left out when the error could contain part of the network key; the logs still have it.</string>
     <string name="help_this_phone_title">This phone</string>
     <string name="help_this_phone_plain">The address your other devices use to reach this phone inside your network.</string>
     <string name="help_this_phone_tech">The IPv4 address of the phone\'s VPN (TUN) interface, announced in the machines ledger.</string>

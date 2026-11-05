@@ -111,6 +111,8 @@ class StatusModelTest {
         )
         assertEquals(VpnState.OFF, m.state)
         assertEquals("boom", m.error)
+        assertNull(m.detail)
+        assertEquals("raw boom", parseStatus("""{"state":"problem","error":"e","detail":"raw boom"}""", 1).detail)
         assertEquals(Badge.OFFLINE, m.devices[0].badge)
         assertEquals(VpnState.PROBLEM, parseStatus("""{"state":"problem","error":"e"}""", 1).state)
         assertEquals(VpnState.LOOKING, parseStatus("""{"state":"looking"}""", 1).state)

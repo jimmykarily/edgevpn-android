@@ -105,7 +105,7 @@ The texts live in string resources. Live values come from the snapshot (extend i
 | Connected | At least one of your devices can be reached from this phone right now. | The edgevpn node is running and has an open libp2p connection to at least one peer listed in the network's machines ledger. | Time since start. |
 | Looking for your devices | The VPN is on, but none of your devices has been reached yet. On mobile data this can take a few minutes. | The node is running and searching the public DHT for peers under the network's rendezvous point, and listening for mDNS on Wi-Fi. No machine in the ledger has an open connection yet. | Time since start. |
 | VPN is off | Your devices can't reach this phone, and it can't reach them. | No edgevpn node is running and no VPN interface exists. | None. |
-| Problem | The VPN could not start, or stopped because of an error. | The exact error, as returned by the failing step. | The error text and when it happened. |
+| Problem | The VPN could not start, or stopped because of an error. | The exact error, as returned by the failing step, left out when it could contain part of the network key. | The error text, the exact error ("Error details") and when it happened. |
 | This phone | The address your other devices use to reach this phone inside your network. | The IPv4 address of the phone's VPN (TUN) interface, announced in the machines ledger. | Address, phone ID. |
 | Using | How this phone is connected to the internet right now. | The transport of the active underlying network, from Android's ConnectivityManager. | Wi-Fi or mobile data. |
 | Your devices | The devices that have joined your network with the same network key. | Entries of the machines bucket in the edgevpn ledger, which every node keeps a copy of and syncs over GossipSub. | Number of devices. |
@@ -127,7 +127,7 @@ The texts live in string resources. Live values come from the snapshot (extend i
 
 - **Check-ins**: add edgevpn's `services.Alive(120s, 600s, 900s)` to the node options, the same as the CLI does for VPN nodes (`cmd/main.go`). Without it other devices show the phone as offline, and the phone has no "last seen" data for them. Extend the existing CLI-defaults test.
 - **Snapshot**: an exported `Snapshot() string` returning JSON, read by the app every 2 seconds. Contents:
-  - `state`: `off`, `looking`, `connected`, `problem`, plus `startedAt` and, for `problem`, `error`.
+  - `state`: `off`, `looking`, `connected`, `problem`, plus `startedAt` and, for `problem`, `error` and, when there is a raw error that cannot contain the network key, `detail`.
   - `self`: phone ID, address in network.
   - `devices`: for each entry of the ledger's machines bucket other than this phone: name (`Hostname`), address (`Address`), phone ID (`PeerID`), `reach` (`direct`, `helper`, `offline`), `remote` (IP and port of the best open connection, if any), `sameNetwork` (bool, per the rule above, computed in Go from the phone's interface addresses via `anet`), `lastSeen` (from the HealthCheck bucket, omitted if unknown).
   - `helpers`: count of connected peers that are not devices.

@@ -46,6 +46,7 @@ type snapshotJSON struct {
 	State     string         `json:"state"`
 	StartedAt int64          `json:"startedAt"`
 	Error     string         `json:"error"`
+	Detail    string         `json:"detail,omitempty"`
 	FailedAt  int64          `json:"failedAt"`
 	Self      selfJSON       `json:"self"`
 	Devices   []deviceJSON   `json:"devices"`
@@ -57,7 +58,7 @@ type snapshotJSON struct {
 type snapshotInput struct {
 	State                    string
 	StartedAt, FailedAt, Now time.Time
-	Failure                  string
+	Failure, Detail          string
 	SelfID, SelfAddress      string
 	SelfName                 string
 	Machines                 []types.Machine
@@ -81,6 +82,7 @@ func buildSnapshot(in snapshotInput) snapshotJSON {
 		State:     in.State,
 		StartedAt: unixOrZero(in.StartedAt),
 		Error:     in.Failure,
+		Detail:    in.Detail,
 		FailedAt:  unixOrZero(in.FailedAt),
 		Self:      selfJSON{ID: in.SelfID, Address: in.SelfAddress, Name: in.SelfName},
 		Devices:   []deviceJSON{},
@@ -199,6 +201,7 @@ func collectSnapshot() snapshotInput {
 		FailedAt:    failedAt,
 		Now:         time.Now(),
 		Failure:     lastFailure,
+		Detail:      failureDetail,
 		SelfAddress: selfAddress,
 		SelfName:    selfName,
 	}
