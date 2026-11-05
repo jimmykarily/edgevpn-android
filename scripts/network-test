@@ -48,13 +48,32 @@ log() { echo "[network-test +$(($(date +%s) - T0))s] $*"; }
 
 fail() {
     log "FAIL: $*"
+    save_screen "$*"
     exit 1
+}
+
+# Writes the current screen (UI dump with editable text redacted, and a
+# screenshot) to $OUT, named after the failing check, so a failure on a
+# machine nobody can look at can still be seen afterwards.
+save_screen() {
+    local name
+    name=$(echo "$1" | tr -c 'A-Za-z0-9\n' '-' | cut -c1-60)
+    mkdir -p "$OUT" 2>/dev/null || return 0
+    ui >"$OUT/fail-$name-ui.xml" 2>/dev/null || true
+    adb_ exec-out screencap -p >"$OUT/fail-$name.png" 2>/dev/null || true
+    echo "[network-test] saved fail-$name-ui.xml and fail-$name.png in $OUT" >&2
 }
 
 adb_() { "$ADB" -s "$SERIAL" "$@"; }
 
 # The screen as text, with editable fields redacted (scripts/emulator ui).
-ui() { EDGEVPN_AVD_PORT="${SERIAL#emulator-}" EDGEVPN_ADB="$ADB" "$EMULATOR" ui; }
+# The last dump is kept in $OUT/last-ui.xml for dismiss_dialogs.
+ui() {
+    local dump
+    dump=$(EDGEVPN_AVD_PORT="${SERIAL#emulator-}" EDGEVPN_ADB="$ADB" "$EMULATOR" ui) || return 1
+    mkdir -p "$OUT" 2>/dev/null && printf '%s\n' "$dump" >"$OUT/last-ui.xml" 2>/dev/null
+    printf '%s\n' "$dump"
+}
 
 # Prints "x y", the centre of the first view whose text or description is
 # exactly $1, or nothing when there is none on screen.
@@ -67,7 +86,7 @@ def label(v):
     return (v or "").replace("\ufffc", "").strip()
 for node in re.findall(r"<node [^>]*>", sys.stdin.read()):
     attrs = dict(re.findall(r"([\w-]+)=\"([^\"]*)\"", node))
-    if want in (label(attrs.get("text")), label(attrs.get("content-desc"))):
+    if want.lower() in (label(attrs.get("text")).lower(), label(attrs.get("content-desc")).lower()):
         x1, y1, x2, y2 = map(int, re.findall(r"\d+", attrs["bounds"]))
         print((x1 + x2) // 2, (y1 + y2) // 2)
         break
@@ -105,12 +124,41 @@ scroll_top() {
     sleep 1
 }
 
+# Closes system dialogs over the app and handles what the last dump shows: an
+# "isn't responding" dialog gets its Wait button tapped, and the app's main
+# activity is started again when no view of the app is on screen.
+dismiss_dialogs() {
+    local xy
+    adb_ shell am broadcast --receiver-include-background -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+    [ -s "$OUT/last-ui.xml" ] || return 0
+    xy=$(python3 -I -c '
+import re, sys
+xml = open(sys.argv[1], errors="replace").read()
+nodes = [dict(re.findall(r"([\w-]+)=\"([^\"]*)\"", n)) for n in re.findall(r"<node [^>]*>", xml)]
+if any("isn\u2019t responding" in n.get("text", "").lower() or "isn'"'"'t responding" in n.get("text", "").lower() for n in nodes):
+    for n in nodes:
+        if n.get("text", "").strip().lower() == "wait":
+            x1, y1, x2, y2 = map(int, re.findall(r"\d+", n["bounds"]))
+            print((x1 + x2) // 2, (y1 + y2) // 2)
+            break
+elif not any(n.get("package") == sys.argv[2] for n in nodes):
+    print("start")
+' "$OUT/last-ui.xml" "$PACKAGE")
+    case "$xy" in
+        "") ;;
+        start) adb_ shell am start -n "$PACKAGE/.MainActivity" >/dev/null 2>&1 || true ;;
+        # shellcheck disable=SC2086
+        *) adb_ shell input tap $xy ;;
+    esac
+}
+
 # Waits up to $2 seconds for $1 on screen and prints how long it took.
 wait_for() {
     local text="$1" timeout="$2" start
     start=$(date +%s)
     until on_screen "$text"; do
         [ $(($(date +%s) - start)) -lt "$timeout" ] || return 1
+        dismiss_dialogs
         sleep 3
     done
     echo $(($(date +%s) - start))
@@ -261,6 +309,7 @@ main() {
     # here instead, as the dialog would.
     adb_ shell appops set "$PACKAGE" ACTIVATE_VPN allow
 
+    dismiss_dialogs
     adb_ shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null
     wait_for "Turn on" 30 >/dev/null || fail "the main screen did not show Turn on"
     tap "Turn on"
