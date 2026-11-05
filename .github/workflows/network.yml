@@ -125,8 +125,17 @@ jobs:
           disable-animations: true
           script: make network-test ANDROID_SERIAL=emulator-5554
 
-      # The app's log, the VM's edgevpn log and the screenshots. The test
-      # replaces the key with a placeholder if it shows up in either log.
+      # The VM's console log, which also covers a VM that never came up and
+      # so never reached the test. The script replaces the key in it.
+      - name: Show the VM's console log
+        if: failure()
+        run: |
+          mkdir -p build/network-test
+          scripts/testpeer serial > build/network-test/testpeer-serial.log || true
+          tail -n 60 build/network-test/testpeer-serial.log
+
+      # The app's log, the VM's edgevpn and console logs and the screenshots.
+      # The key is replaced with a placeholder wherever it shows up.
       - name: Upload the logs
         if: failure()
         uses: actions/upload-artifact@v7

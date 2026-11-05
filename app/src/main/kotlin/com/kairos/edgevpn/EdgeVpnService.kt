@@ -156,8 +156,8 @@ class EdgeVpnService : VpnService() {
         try {
             Edgevpn.setExtraPeers(AppSettings.extraPeers(this))
         } catch (e: Exception) {
-            Log.e(TAG, "Invalid extra peers in settings", e)
-            failStart("The extra peers in the settings are not valid.")
+            Log.e(TAG, "Invalid extra peers stored by a test: ${AppSettings.extraPeers(this)}", e)
+            failStart("The VPN could not start. The logs have the details.")
             return
         }
         Edgevpn.setStatusListener(newStatusListener(session))

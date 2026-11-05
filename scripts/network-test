@@ -35,7 +35,7 @@ CONNECT_TIMEOUT="${NETWORK_TEST_CONNECT_TIMEOUT:-300}"
 RECOVER_TIMEOUT="${NETWORK_TEST_RECOVER_TIMEOUT:-300}"
 # Longer than the peer's 60 second ownership TTL plus its 30 second scrub
 # interval, so the peer has dropped the app's entry when the VPN comes back.
-OFF_SECONDS="${NETWORK_TEST_OFF_SECONDS:-90}"
+OFF_SECONDS="${NETWORK_TEST_OFF_SECONDS:-100}"
 LONG="${NETWORK_TEST_LONG:-1}"
 OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
 
@@ -123,45 +123,39 @@ ping_until() {
     done
 }
 
-# The app's listening TCP sockets, over IPv4 and IPv6. libp2p listens once
-# on each, so a count above 2 means an old host from an earlier session is
-# still alive.
+# The app's listening TCP sockets, over IPv4 and IPv6. A count that grows
+# after the VPN was turned off and on means a libp2p host from the earlier
+# session is still alive.
 listen_sockets() {
     local uid
-    # Android 35 prints the app's uid as appId=, older releases as userId=.
-    uid=$(adb_ shell dumpsys package "$PACKAGE" | sed -n 's/.*\(appId\|userId\)=\([0-9]*\).*/\2/p' | head -1)
-    [ -n "$uid" ] || fail "could not find the app's uid"
+    # One line per package whose name contains $PACKAGE, as
+    # "package:<name> uid:<uid>"; the test APK's name contains it too.
+    uid=$(adb_ shell cmd package list packages -U "$PACKAGE" | tr -d '\r' |
+        sed -n "s/^package:$PACKAGE uid:\([0-9]*\)\$/\1/p")
+    [ -n "$uid" ] || return 1
     adb_ shell cat /proc/net/tcp /proc/net/tcp6 | awk -v uid="$uid" '$4 == "0A" && $8 == uid' | wc -l
 }
 
-check_listen_sockets() {
-    local n
-    n=$(listen_sockets)
-    log "app LISTEN sockets: $n"
-    [ "$n" -eq 2 ] || fail "the app has $n listening sockets, want 2"
+# Exits 0 when the peer lists the app, 1 when it does not, and fails the
+# test when the peer cannot be asked, so an SSH or API error never reads as
+# "not listed".
+peer_has_app() {
+    local machines
+    machines=$("$TESTPEER" machines) || fail "could not read the peer's machine list"
+    echo "$machines" | grep -q "^$APP_ADDRESS "
 }
 
-peer_has_app() { "$TESTPEER" machines | grep -q "^$APP_ADDRESS "; }
+# Copies stdin to stdout with the run's key replaced (scripts/testpeer scrub).
+scrub() { "$TESTPEER" scrub; }
 
-# Copies the app's and the VM's logs into $OUT. The key is replaced if it
-# shows up in either, so the files are safe to upload.
+# Copies the app's log and the VM's edgevpn and console logs into $OUT,
+# with the key replaced wherever it shows up, so the files are safe to
+# upload. Runs before the peer is stopped, which deletes the console log.
 collect_logs() {
     mkdir -p "$OUT"
-    adb_ logcat -d -v time >"$OUT/logcat.txt" 2>/dev/null || true
+    adb_ logcat -d -v time 2>/dev/null | scrub >"$OUT/logcat.txt" || true
     "$TESTPEER" logs >"$OUT/testpeer-edgevpn.log" 2>/dev/null || true
-    local key
-    key=$("$TESTPEER" key 2>/dev/null) || return 0
-    python3 -I - "$key" "$OUT/logcat.txt" "$OUT/testpeer-edgevpn.log" <<'PY'
-import sys
-secret = open(sys.argv[1]).read().strip()
-for path in sys.argv[2:]:
-    try:
-        text = open(path, errors="replace").read()
-    except OSError:
-        continue
-    if secret and secret in text:
-        open(path, "w").write(text.replace(secret, "<redacted key>"))
-PY
+    "$TESTPEER" serial >"$OUT/testpeer-serial.log" 2>/dev/null || true
 }
 
 finish() {
@@ -178,6 +172,8 @@ finish() {
     if [ "$status" -eq 0 ]; then
         log "PASS"
     else
+        log "last lines of the VM's console log:"
+        tail -n 40 "$OUT/testpeer-serial.log" 2>/dev/null
         log "logs in $OUT"
     fi
     exit "$status"
@@ -228,8 +224,12 @@ main() {
     adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/token' <"$("$TESTPEER" key)"
     echo "$peer" | adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/peers'
     local result
-    result=$(adb_ shell am instrument -w -e class com.kairos.edgevpn.NetworkTestSetup "$RUNNER")
-    echo "$result" | grep -q "^OK (1 test)" || fail "storing the test network: $result"
+    result=$(adb_ shell am instrument -w -e class com.kairos.edgevpn.NetworkTestSetup "$RUNNER" | scrub)
+    if ! echo "$result" | grep -q "^OK (1 test)"; then
+        # Only the lines that say what failed, never the whole output.
+        echo "$result" | grep -E "^(FAILURES|There was|[0-9]+\)|Tests run|[a-zA-Z.]*(Error|Exception))" | head -n 20
+        fail "storing the test network in the app"
+    fi
     log "test network stored in the app"
 
     # Android asks once whether the app may run a VPN. The answer is set
@@ -247,7 +247,12 @@ main() {
 
     ping_until app "$PEER_ADDRESS" 60 || fail "the app cannot ping the peer"
     ping_until peer "$APP_ADDRESS" 60 || fail "the peer cannot ping the app"
-    check_listen_sockets
+    local sockets
+    sockets=$(listen_sockets) || fail "could not find the app's uid"
+    log "app LISTEN sockets: $sockets"
+    [ "$sockets" -gt 0 ] || fail "the app has no listening sockets"
+    peer_has_app || fail "the peer does not list $APP_ADDRESS while connected"
+    log "the peer lists $APP_ADDRESS"
     screens
 
     if [ "$LONG" != 0 ]; then
@@ -265,7 +270,10 @@ main() {
         log "connected again after ${took}s"
         ping_until app "$PEER_ADDRESS" "$RECOVER_TIMEOUT" || fail "the app cannot ping the peer after off and on"
         ping_until peer "$APP_ADDRESS" "$RECOVER_TIMEOUT" || fail "the peer cannot ping the app after off and on"
-        check_listen_sockets
+        local after
+        after=$(listen_sockets) || fail "could not find the app's uid"
+        log "app LISTEN sockets after off and on: $after (before: $sockets)"
+        [ "$after" -eq "$sockets" ] || fail "the app has $after listening sockets after off and on, want $sockets as before"
     fi
 
     shot connected-final
