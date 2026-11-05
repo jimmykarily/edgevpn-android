@@ -26,3 +26,9 @@ golib/vendor/
 
 # Network tokens kept next to the checkout for testing
 *.token
+
+# Python bytecode from running scripts/scrub-key
+scripts/__pycache__/
+
+# A log file the owner keeps at the root of the checkout
+/logs.txt
