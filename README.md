@@ -81,6 +81,20 @@ make e2e      # build with android/amd64 added and run the tests on emulator-555
 
 The **E2E tests** workflow (`.github/workflows/e2e.yml`) runs the same target on every pull request and every push to `main`, on an API 35 x86_64 emulator, and uploads the reports when a test fails. It uses no secrets.
 
+## Test peer
+
+Real-network checks need a second device in the network. `scripts/testpeer` runs one: a disposable QEMU VM (Debian 12 cloud image, KVM, 512 MB, headless) with edgevpn inside, at VPN address `10.1.0.10`. It needs `qemu-system-x86_64`, `qemu-img`, `xorriso`, `ssh` and a usable `/dev/kvm`, and no root: the VM uses QEMU user-mode networking.
+
+| Target | Description |
+|--------|-------------|
+| `make peer-up` | Start the VM with a new temporary network key and wait until edgevpn is up |
+| `make peer-down` | Stop the VM and delete the run directory, including the key |
+| `make peer-status` | Whether the VM and edgevpn are running, and the VPN interface |
+
+`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `key` (the path of the key file, never its contents) and `addr` (the VM's libp2p address as the emulator reaches it).
+
+The first `up` downloads the cloud image and builds edgevpn at the version `golib/go.mod` requires, both into `binaries/testpeer/`. Each run boots from a fresh overlay disk and generates its own key into `binaries/testpeer/run/token`; the owner's network key is never used. edgevpn in the VM runs with an ownership TTL of 60 seconds instead of the default 8 minutes, so it forgets a device that has been silent for about a minute. The host forwards `127.0.0.1:40022` to the VM's SSH and `127.0.0.1:40001` to its libp2p port (override with `TESTPEER_SSH_PORT` and `TESTPEER_P2P_PORT`).
+
 ## Auto-downloaded tools
 
 On first build, the Makefile downloads these into `binaries/` (gitignored):

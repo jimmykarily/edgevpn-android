@@ -57,7 +57,7 @@ FORCE:
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build FORCE
+.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status FORCE
 
 all: app
 
@@ -214,6 +214,18 @@ e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0 || exit 1; \
 	done
 	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
+
+# ── Test peer ────────────────────────────────────────────────────
+# A disposable QEMU VM running edgevpn with a temporary key, driven by
+# scripts/testpeer, as the second device for real-network checks.
+peer-up:
+	scripts/testpeer up
+
+peer-down:
+	scripts/testpeer down
+
+peer-status:
+	scripts/testpeer status
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)
