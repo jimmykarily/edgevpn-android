@@ -1,6 +1,6 @@
 # Status screen, settings and logs: design
 
-Date: 2026-11-05. Approved mockups: `2026-11-05-status-screen/main-screen.html` and `2026-11-05-status-screen/settings.html` (open them in a browser; they are self-contained HTML fragments, so unstyled bits are expected).
+Date: 2026-11-05. Approved mockups: `2026-11-05-status-screen/main-screen.html`, `2026-11-05-status-screen/settings.html` and `2026-11-05-status-screen/help-icons.html` (open them in a browser; they are self-contained HTML fragments, so unstyled bits are expected).
 
 ## Why
 
@@ -86,6 +86,40 @@ Shown from the main screen when no key is stored, and from "Replace key". As in 
 A full screen with the most recent log lines, newest at the bottom, auto-scrolling unless the user has scrolled up, and a "Copy all" action. Lines are kept by the Go library in a ring buffer of the last 2000 lines, so they exist even when no screen was open. The Go library also writes every line to logcat itself (tag `EdgeVPN`), so `make logs` works regardless of what the UI is doing.
 
 The buffer and the Logs screen hold edgevpn's own messages (the ones that go through `bufferLogger`), not libp2p's. libp2p logs through its own logging package to standard error, which gomobile forwards to logcat under the tag `GoLog` (seen on the phone). At debug level libp2p writes thousands of lines a minute and would push edgevpn's lines out of the buffer within seconds. So "Detailed logs" makes edgevpn's messages in the buffer more detailed (debug instead of info) and raises libp2p to debug in logcat only. The Logs screen says so in one line at the top when detailed logs are on: "Network library details are in the developer log (logcat)."
+
+### Help: the (?) icons
+
+Every plain-language term gets a small, faded (?) icon next to it, the first time the term appears on a screen: the status title, the "This phone" and "Using" pills, section titles, each badge, each tile, the map legend, and each settings item. Tapping it opens a bottom sheet with:
+
+1. the term, and the device name when the sheet is about one device;
+2. the plain explanation;
+3. a grey "Technical details" box with the real names of things;
+4. where it applies, a "This connection" or "This phone" part with live values, refreshed while the sheet is open.
+
+The texts live in string resources. Live values come from the snapshot (extend it where a value below is not already in it). The approved wording to start from, which the builder may polish without changing the meaning:
+
+| Term | Plain explanation | Technical details | Live values |
+|---|---|---|---|
+| Connected | At least one of your devices can be reached from this phone right now. | The edgevpn node is running and has an open libp2p connection to at least one peer listed in the network's machines ledger. | Time since start. |
+| Looking for your devices | The VPN is on, but none of your devices has been reached yet. On mobile data this can take a few minutes. | The node is running and searching the public DHT for peers under the network's rendezvous point, and listening for mDNS on Wi-Fi. No machine in the ledger has an open connection yet. | Time since start. |
+| VPN is off | Your devices can't reach this phone, and it can't reach them. | No edgevpn node is running and no VPN interface exists. | None. |
+| Problem | The VPN could not start, or stopped because of an error. | The exact error, as returned by the failing step. | The error text and when it happened. |
+| This phone | The address your other devices use to reach this phone inside your network. | The IPv4 address of the phone's VPN (TUN) interface, announced in the machines ledger. | Address, phone ID. |
+| Using | How this phone is connected to the internet right now. | The transport of the active underlying network, from Android's ConnectivityManager. | Wi-Fi or mobile data. |
+| Your devices | The devices that have joined your network with the same network key. | Entries of the machines bucket in the edgevpn ledger, which every node keeps a copy of and syncs over GossipSub. | Number of devices. |
+| Direct | This phone and the device talk straight to each other. This is the fastest way. | At least one open libp2p connection to the peer is not relayed (no /p2p-circuit in the remote multiaddr) and not limited. | Remote multiaddr, transport (TCP or QUIC), time open. |
+| Via helper | Your phone and the device can't reach each other directly, usually because both are behind a home router or a mobile network. Their traffic passes through another computer on the internet that offered to help. It works, but it is slower, and the helper may limit how long the connection lasts. | The connection is a libp2p circuit relay v2 connection (multiaddr contains /p2p-circuit). Relays usually limit these (default: 2 minutes, 128 KiB). libp2p tries hole punching (DCUtR) to upgrade to a direct connection. | Relay multiaddr, limited yes or no, time open. |
+| Offline | The device is in your network but can't be reached right now. It may be switched off or without internet. | The peer is in the machines ledger but there is no open libp2p connection to it. "Last seen" comes from its last health check in the ledger. | Last health check time, if any. |
+| same Wi-Fi as you / over the internet | Whether the device is on the same local network as this phone. | The remote IP of the direct connection is a private address in the same subnet as one of the phone's Wi-Fi addresses, or it is not. | Remote IP. |
+| Finding your devices | How well this phone can find your devices on the internet. | Discovery uses the public libp2p DHT (Kademlia) and, on Wi-Fi, mDNS. | None. |
+| public helpers available | Other computers on the internet this phone is talking to. They help your devices find each other and can pass traffic along when a direct connection is impossible. | Number of connected libp2p peers that are not machines of the network: DHT servers, relays and bootstrap nodes. | Count. |
+| last heard from your network | How long ago any of your devices last checked in. | The newest health check timestamp written to the ledger by another node (edgevpn's Alive service, every 2 minutes). | Timestamp and which device. |
+| Network key | The secret that lets devices join your network. Anyone who has it can join, so keep it private. | The edgevpn network token: base64-encoded YAML holding the room name, the rendezvous string, two OTP keys (one rotates the DHT rendezvous point, one encrypts the messages between nodes), the mDNS service name and the maximum message size. | None (never shown). |
+| Name | What your other devices see as this phone's name. | The Hostname field of this phone's entry in the machines ledger. | Current value. |
+| Address in your network | Same as "This phone". | Same as "This phone", plus: the VPN routes 10.1.0.0/24 (the address with a /24 mask) through the tunnel. | Address, route. |
+| Detailed logs | Writes much more detail to the logs, to help find problems. Uses more battery, so turn it off when done. | Sets the edgevpn log level to debug and the libp2p log level to debug. libp2p's lines go to logcat (tag GoLog), not to the in-app logs. | On or off. |
+| Phone ID | A unique identifier for this phone in your network. | The libp2p peer ID, derived from the phone's Ed25519 identity key. It signs this phone's ledger entries. | Full peer ID. |
+| Start fresh | Makes this phone forget everything and start over as a new device. | Deletes the network token, the Ed25519 identity key (so a new peer ID is generated) and all settings and logs. The old ledger entries stay owned by the old identity until the ownership TTL (8 minutes) expires. | None. |
 
 ## Go library changes
 
