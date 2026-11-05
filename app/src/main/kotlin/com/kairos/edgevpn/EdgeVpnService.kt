@@ -129,7 +129,7 @@ class EdgeVpnService : VpnService() {
         tunPfd = pfd
 
         try {
-            Edgevpn.start(fd.toLong(), token, nodeKey)
+            Edgevpn.start(fd.toLong(), token, nodeKey, "10.1.0.2", android.os.Build.MODEL)
             isRunning = true
             Log.i(TAG, "VPN started")
         } catch (e: Exception) {
