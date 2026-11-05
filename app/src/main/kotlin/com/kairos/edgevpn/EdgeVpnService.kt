@@ -166,7 +166,10 @@ class EdgeVpnService : VpnService() {
             .addAddress(address, 24)
             .addRoute(routeFor(address), 24)
             // The VPN carries only IPv4. Without this Android gives the VPN an
-            // unreachable ::/0 route and no app can use IPv6.
+            // unreachable ::/0 route and no app can use IPv6. With Android's
+            // "Always-on VPN, block connections without VPN" IPv6 may now bypass
+            // the VPN; that is acceptable because the VPN carries only
+            // 10.1.0.0/24 (untested).
             .allowFamily(OsConstants.AF_INET6)
             .setMtu(1500)
             .setSession("EdgeVPN")
