@@ -44,15 +44,20 @@ GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod golib/go.sum
 APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
 SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 
-# The stamp records GOMOBILE_TARGETS, so the AAR is rebuilt when they change.
+# The stamp records GOMOBILE_TARGETS and is rewritten only when they differ,
+# so the AAR is rebuilt exactly when they change. make -n leaves it alone.
 TARGETS_STAMP := build/gomobile-targets.stamp
-$(shell mkdir -p build; [ "$$(cat $(TARGETS_STAMP) 2>/dev/null)" = "$(GOMOBILE_TARGETS)" ] || echo "$(GOMOBILE_TARGETS)" > $(TARGETS_STAMP))
+$(TARGETS_STAMP): FORCE
+	@mkdir -p build
+	@[ "$$(cat $@ 2>/dev/null)" = "$(GOMOBILE_TARGETS)" ] || echo "$(GOMOBILE_TARGETS)" > $@
+
+FORCE:
 
 # Delete targets whose recipes fail, so stale/empty files don't block rebuilds.
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot
+.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot FORCE
 
 all: app
 
@@ -156,7 +161,7 @@ test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 # A headless emulator (AVD "edgevpn", serial emulator-5556) driven by
 # scripts/emulator. emu-run builds with android/amd64 added, because the
 # emulator is x86_64.
-emu-setup:
+emu-setup: $(SDK_STAMP)
 	scripts/emulator setup
 
 emu-up:
