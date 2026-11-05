@@ -152,6 +152,14 @@ class EdgeVpnService : VpnService() {
         }
 
         Edgevpn.setDetailedLogs(AppSettings.detailedLogs(this))
+        Edgevpn.setCheckInSeconds(AppSettings.checkInSeconds(this).toLong())
+        try {
+            Edgevpn.setExtraPeers(AppSettings.extraPeers(this))
+        } catch (e: Exception) {
+            Log.e(TAG, "Invalid extra peers in settings", e)
+            failStart("The extra peers in the settings are not valid.")
+            return
+        }
         Edgevpn.setStatusListener(newStatusListener(session))
 
         val pfd = Builder()

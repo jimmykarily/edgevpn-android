@@ -83,8 +83,9 @@ func networkConfig(token, address string) config.Config {
 		LogLevel:       logLevel,
 		Libp2pLogLevel: libp2pLogLevel,
 		Discovery: config.Discovery{
-			DHT:  true,
-			MDNS: true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
+			DHT:            true,
+			MDNS:           true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
+			BootstrapPeers: bootstrapPeers(),
 		},
 		// Match the CLI defaults (cmd/util.go: autorelay=true, holepunch=true).
 		// These are essential for NAT traversal when both peers are behind NAT:
@@ -169,7 +170,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
 	// The Alive options must come before the VPN service options: the VPN
 	// service blocks in its packet loop, so services after it never start.
-	nodeOpts = append(nodeOpts, services.Alive(aliveAnnounce, aliveScrub, aliveMax)...)
+	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
 	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService))
 
 	// Inject a protected TCP transport so every socket fd is passed through
