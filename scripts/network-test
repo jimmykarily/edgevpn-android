@@ -420,6 +420,13 @@ main() {
         [ "$after" -eq "$sockets" ] || fail "the app has $after listening sockets after off and on, want $sockets as before"
     fi
 
+    # Every socket the app opens is protected from the VPN through
+    # VpnService.protect; a failure shows up in the app's log.
+    if adb_ logcat -d -v time 2>/dev/null | grep -E "VpnService\.protect\([0-9]+\) (returned false|timed out)" | head -n 5 | grep .; then
+        fail "VpnService.protect failed during the run"
+    fi
+    log "no VpnService.protect failures in the app's log"
+
     shot connected-final
     "$TESTPEER" machines | sed 's/^/[peer machines] /'
 }
