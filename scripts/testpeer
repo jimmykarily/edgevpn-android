@@ -140,7 +140,7 @@ write_files:
       Wants=network-online.target
       [Service]
       EnvironmentFile=/etc/edgevpn/env
-      ExecStart=/usr/local/bin/edgevpn --address $VPN_ADDRESS/24 --log-level debug --privkey-cache --privkey-cache-dir /var/lib/edgevpn --ownership-ttl $OWNERSHIP_TTL --aliveness-healthcheck-interval 15 --aliveness-healthcheck-scrub-interval 30 --aliveness-healthcheck-max-interval 45 --listen-maddrs /ip4/0.0.0.0/tcp/4001
+      ExecStart=/usr/local/bin/edgevpn --address $VPN_ADDRESS/24 --log-level debug --privkey-cache --privkey-cache-dir /var/lib/edgevpn --ownership-ttl $OWNERSHIP_TTL --aliveness-healthcheck-interval 15 --aliveness-healthcheck-scrub-interval 30 --aliveness-healthcheck-max-interval 45 --listen-maddrs /ip4/0.0.0.0/tcp/4001 --api --api-listen 127.0.0.1:8080
       StandardOutput=append:/var/log/edgevpn.log
       StandardError=append:/var/log/edgevpn.log
       Restart=on-failure
@@ -252,6 +252,16 @@ cmd_key() {
     echo "$TOKEN_FILE"
 }
 
+# The devices in the VM's machine list, one "address peer-id" per line,
+# from the edgevpn API that listens only inside the VM.
+cmd_machines() {
+    vm curl -fsS http://127.0.0.1:8080/api/machines | python3 -I -c '
+import json, sys
+for m in json.load(sys.stdin) or []:
+    print(m.get("Address", ""), m.get("PeerID", ""))
+'
+}
+
 # The VM's libp2p address as the emulator reaches it.
 cmd_addr() {
     local id
@@ -270,6 +280,7 @@ usage: scripts/testpeer <command>
   ping <addr>   ping an address from inside the VM
   logs          the VM's edgevpn log
   key           the path of the temporary key file (never its contents)
+  machines      the devices in the VM's machine list, as "address peer-id"
   addr          the VM's libp2p address as seen from the Android emulator
 USAGE
 }
@@ -281,6 +292,7 @@ case "${1:-}" in
     ping) cmd_ping "${2:-}" ;;
     logs) cmd_logs ;;
     key) cmd_key ;;
+    machines) cmd_machines ;;
     addr) cmd_addr ;;
     *) usage; exit 1 ;;
 esac

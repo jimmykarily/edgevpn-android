@@ -57,7 +57,7 @@ FORCE:
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status FORCE
+.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test FORCE
 
 all: app
 
@@ -226,6 +226,16 @@ peer-down:
 
 peer-status:
 	scripts/testpeer status
+
+# ── Network test ─────────────────────────────────────────────────
+# The debug app on the emulator named by ANDROID_SERIAL joins the test
+# peer's network, pings it both ways, turns off for longer than the peer's
+# ownership TTL and checks that traffic comes back after turning on again.
+# scripts/network-test starts the peer when it is not running.
+# NETWORK_TEST_LONG=0 skips the off/on part.
+network-test:
+	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
+	ANDROID_SERIAL=$(ANDROID_SERIAL) scripts/network-test
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)
