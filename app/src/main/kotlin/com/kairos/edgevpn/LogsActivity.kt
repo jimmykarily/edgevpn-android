@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.PersistableBundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -57,9 +58,9 @@ class LogsActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
-        note.visibility = if (Edgevpn.detailedLogs()) android.view.View.VISIBLE else android.view.View.GONE
+        note.visibility = if (Edgevpn.detailedLogs()) View.VISIBLE else View.GONE
         val logs = Edgevpn.recentLogs()
-        if (logs == shown) return
+        if (!shouldRefreshLogs(shown, logs, text.hasSelection())) return
         val first = shown == null
         val stick = first || shouldStickToBottom(
             scroll.scrollY, scroll.height, text.height + scroll.paddingTop + scroll.paddingBottom,
@@ -77,7 +78,12 @@ class LogsActivity : AppCompatActivity() {
     }
 
     private fun copyAll() {
-        val clip = ClipData.newPlainText(getString(R.string.logs_title), Edgevpn.recentLogs())
+        val logs = Edgevpn.recentLogs()
+        if (logs.isEmpty()) {
+            Toast.makeText(this, R.string.logs_nothing_to_copy, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val clip = ClipData.newPlainText(getString(R.string.logs_title), logs)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             clip.description.extras = PersistableBundle().apply {
                 putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
