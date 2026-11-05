@@ -248,6 +248,10 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	currentNode = n
 	startedAt = time.Now()
 
+	if err := announceName(ctx, n); err != nil {
+		emit("WARN ", fmt.Sprintf("name announcement not started: %v", err))
+	}
+
 	go func() {
 		emit("INFO ", "node.Start: entering (blocks in VPN service readPackets loop)")
 		err := n.Start(ctx)
@@ -307,6 +311,8 @@ func Stop() {
 	failedAt = time.Time{}
 	currentNode = nil
 	startedAt = time.Time{}
+	selfAddress = ""
+	selfName = ""
 	if tunFile != nil {
 		if err := tunFile.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			emit("WARN ", fmt.Sprintf("failed to close tun file in Stop(): %v", err))
