@@ -33,6 +33,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The emulator refuses to start when the runner has less free disk than
+      # its userdata partition needs. The runner image ships toolchains this
+      # job never touches: it builds with its own Android SDK, JDK and Go under
+      # binaries/ and the Go setup action, and runs no containers. Deleting
+      # them frees several GB before the caches are restored into the space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -71,7 +83,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: android-avd-35-default-x86_64
+          key: android-avd-35-default-x86_64-disk2g
 
       # The Debian cloud image and the edgevpn binary built for the VM. The
       # script names both by version, and the key changes with the script
@@ -109,6 +121,10 @@ jobs:
           target: default
           arch: x86_64
           force-avd-creation: false
+          # A small userdata partition, so the AVD fits in what the runner has
+          # left. The create step and the run step must agree, because they
+          # share one cached AVD.
+          disk-size: 2048M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Device created and snapshotted for the cache."
@@ -121,6 +137,10 @@ jobs:
           target: default
           arch: x86_64
           force-avd-creation: false
+          # A small userdata partition, so the AVD fits in what the runner has
+          # left. The create step and the run step must agree, because they
+          # share one cached AVD.
+          disk-size: 2048M
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: make network-test ANDROID_SERIAL=emulator-5554
