@@ -52,6 +52,21 @@ make install      # build + push APK to USB-connected device
 | `make clean` | Remove build outputs |
 | `make distclean` | Remove build outputs and all downloaded tools (`binaries/`) |
 
+## Emulator
+
+A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the preview app without a phone. It uses the emulator and the Android 35 system image from `~/Android/Sdk` (override with `EDGEVPN_EMULATOR_SDK`) and this repo's own adb. The port can be changed with `EDGEVPN_AVD_PORT`.
+
+| Target | Description |
+|--------|-------------|
+| `make emu-setup` | Install the emulator and system image, create the AVD (once) |
+| `make emu-up` / `make emu-down` / `make emu-status` | Start headless and wait for boot, stop (saves a snapshot), report state |
+| `make emu-run` | Build the preview APK with the emulator architecture, install and launch it |
+| `make emu-shot` | Write `screenshot.png` |
+
+`scripts/emulator` has more commands: `up-windowed`, `reset`, `install`, `launch`, `stop-app`, `shot [file]`, `ui` (view hierarchy as text) and `logs`. The emulator reaches the internet through the host's NAT, never the host's local network.
+
+The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `android/arm64`, which is what phones and CI need). `make emu-run` sets it to `android/arm64,android/amd64`. Changing the value rebuilds the AAR, so building again with a different value takes a full gomobile bind.
+
 ## Auto-downloaded tools
 
 On first build, the Makefile downloads these into `binaries/` (gitignored):

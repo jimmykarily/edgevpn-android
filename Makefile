@@ -32,6 +32,10 @@ MOBILE_VER := $(shell cd golib && go list -m -f '{{.Version}}' golang.org/x/mobi
 MOBILE_BIN := $(BINARIES)/gomobile-$(MOBILE_VER)
 GOMOBILE   := $(MOBILE_BIN)/gomobile
 
+# Architectures the Go library is built for. The emulator needs android/amd64
+# as well; emu-run sets it.
+GOMOBILE_TARGETS ?= android/arm64
+
 # ── Outputs ──────────────────────────────────────────────────────
 GOLIB_AAR  := app/libs/edgevpn.aar
 APK        := app/build/outputs/apk/debug/app-debug.apk
@@ -40,11 +44,15 @@ GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod golib/go.sum
 APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
 SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 
+# The stamp records GOMOBILE_TARGETS, so the AAR is rebuilt when they change.
+TARGETS_STAMP := build/gomobile-targets.stamp
+$(shell mkdir -p build; [ "$$(cat $(TARGETS_STAMP) 2>/dev/null)" = "$(GOMOBILE_TARGETS)" ] || echo "$(GOMOBILE_TARGETS)" > $(TARGETS_STAMP))
+
 # Delete targets whose recipes fail, so stale/empty files don't block rebuilds.
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean
+.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot
 
 all: app
 
@@ -100,13 +108,13 @@ $(GOMOBILE):
 # //go:linkname to patch Go's internal net.zoneCache for Android DNS fixes.
 # Go 1.23+ rejects this by default. Disable the check until anet is fixed
 # upstream: https://github.com/wlynxg/anet/issues/11
-$(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
+$(GOLIB_AAR): $(GO_SOURCES) $(TARGETS_STAMP) | $(GOMOBILE) $(SDK_STAMP)
 	@echo "==> Building Go library (gomobile bind)..."
 	@mkdir -p app/libs
 	cd golib && \
 	  PATH=$(MOBILE_BIN):$(JAVA_HOME)/bin:$$PATH \
 	  ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VER) \
-	  $(GOMOBILE) bind -target android/arm64 -androidapi $(MIN_SDK) \
+	  $(GOMOBILE) bind -target $(GOMOBILE_TARGETS) -androidapi $(MIN_SDK) \
 	    -ldflags="-checklinkname=0" \
 	    -o $(CURDIR)/$(GOLIB_AAR) .
 
@@ -143,6 +151,30 @@ test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	cd golib && go test ./...
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	$(GRADLE) -p $(CURDIR) testDebugUnitTest
+
+# ── Emulator ─────────────────────────────────────────────────────
+# A headless emulator (AVD "edgevpn", serial emulator-5556) driven by
+# scripts/emulator. emu-run builds with android/amd64 added, because the
+# emulator is x86_64.
+emu-setup:
+	scripts/emulator setup
+
+emu-up:
+	scripts/emulator up
+
+emu-down:
+	scripts/emulator down
+
+emu-status:
+	scripts/emulator status
+
+emu-run:
+	$(MAKE) preview GOMOBILE_TARGETS=android/arm64,android/amd64
+	scripts/emulator install
+	scripts/emulator launch
+
+emu-shot:
+	scripts/emulator shot
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)
