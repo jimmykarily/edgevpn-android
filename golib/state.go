@@ -80,3 +80,18 @@ func ReportStartFailure(reason string) {
 	defer mu.Unlock()
 	recordFailure(reason)
 }
+
+// The reasons the app shows when the VPN cannot run. The raw errors go to
+// the logs only.
+const (
+	reasonKey     = "The network key could not be used."
+	reasonStart   = "The VPN could not start."
+	reasonStopped = "The VPN stopped unexpectedly."
+)
+
+// fail logs the raw error and remembers the plain reason for the app. The
+// caller must hold mu.
+func fail(reason, raw string) {
+	emit("ERROR", raw)
+	recordFailure(reason)
+}

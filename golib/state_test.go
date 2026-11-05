@@ -3,6 +3,7 @@ package edgevpn
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func newTunPipe(t *testing.T) (*os.File, *os.File) {
 func TestHandleNodeExitOfTheCurrentSession(t *testing.T) {
 	l := &recordingListener{}
 	SetStatusListener(l)
-	t.Cleanup(func() { SetStatusListener(nil); Stop() })
+	t.Cleanup(func() { SetStatusListener(nil); Stop(); ClearLogs() })
 
 	n := newTestNode(t)
 	tun, _ := newTunPipe(t)
@@ -89,6 +90,18 @@ func TestHandleNodeExitOfTheCurrentSession(t *testing.T) {
 	if len(l.reasons) != 1 || l.reasons[0] != "boom" {
 		t.Errorf("listener calls = %v, want one call with boom", l.reasons)
 	}
+	if got := rememberedFailure(); got != reasonStopped {
+		t.Errorf("remembered failure = %q, want %q", got, reasonStopped)
+	}
+	if !strings.Contains(RecentLogs(), "ERROR node.Start returned error: boom") {
+		t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
+	}
+}
+
+func rememberedFailure() string {
+	mu.Lock()
+	defer mu.Unlock()
+	return lastFailure
 }
 
 func TestHandleNodeExitOfAStaleSessionLeavesTheNewOneAlone(t *testing.T) {
