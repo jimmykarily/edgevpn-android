@@ -11,6 +11,7 @@ require (
 	github.com/wlynxg/anet v0.0.6-0.20250109065809-5501d401a269
 	go.uber.org/fx v1.24.0
 	golang.org/x/mobile v0.0.0-20260211191516-dcd2a3258864
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -135,6 +136,5 @@ require (
 	golang.zx2c4.com/wireguard/windows v1.0.1 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
