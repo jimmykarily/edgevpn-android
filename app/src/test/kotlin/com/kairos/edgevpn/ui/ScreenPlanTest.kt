@@ -47,6 +47,17 @@ class ScreenPlanTest {
     }
 
     @Test
+    fun connectedWithOneDeviceSaysYourDevice() {
+        assertTrue(planScreen(model(VpnState.CONNECTED, listOf(row("1", Badge.DIRECT)))).onlyDevice)
+    }
+
+    @Test
+    fun connectedWithSeveralDevicesCountsThem() {
+        val devices = listOf(row("1", Badge.DIRECT), row("2", Badge.OFFLINE))
+        assertFalse(planScreen(model(VpnState.CONNECTED, devices)).onlyDevice)
+    }
+
+    @Test
     fun connectedWithoutAnyCheckInLeavesTheLastHeardTileOut() {
         val p = planScreen(model(VpnState.CONNECTED, listOf(row("1", Badge.DIRECT)), lastHeard = null))
         assertEquals(SecondTile.NONE, p.secondTile)
