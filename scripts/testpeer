@@ -243,18 +243,11 @@ cmd_ping() {
     vm ping -c 3 -W 2 "$1"
 }
 
-# Copies stdin to stdout with this run's key replaced by a placeholder, so
-# a log can be shown or uploaded even if the key ended up in it.
+# Copies stdin to stdout with this run's key, and the secrets inside it,
+# replaced (scripts/scrub-key). Without a key for this run it prints nothing
+# and fails, so a caller never shows text it could not scrub.
 cmd_scrub() {
-    python3 -I -c '
-import sys
-try:
-    secret = open(sys.argv[1]).read().strip()
-except OSError:
-    secret = ""
-for line in sys.stdin:
-    sys.stdout.write(line.replace(secret, "<redacted key>") if secret else line)
-' "$TOKEN_FILE"
+    python3 -I "$ROOT/scripts/scrub-key" "$TOKEN_FILE"
 }
 
 cmd_logs() {
@@ -301,7 +294,8 @@ usage: scripts/testpeer <command>
   ping <addr>   ping an address from inside the VM
   logs          the VM's edgevpn log
   serial        the VM's console log
-  scrub         copy stdin to stdout with this run's key replaced
+  scrub         copy stdin to stdout with this run's key replaced; fails
+                without a key
   key           the path of the temporary key file (never its contents)
   machines      the devices in the VM's machine list, as "address peer-id"
   addr          the VM's libp2p address as seen from the Android emulator

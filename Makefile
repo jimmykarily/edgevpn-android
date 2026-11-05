@@ -150,9 +150,11 @@ release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	@ls app/build/outputs/apk/release/*.apk
 
 # ── Tests ────────────────────────────────────────────────────────
-# The Go tests run on the build host. The app's unit tests run on the JVM
-# and need the AAR, because the app module links against it.
+# The network test's key scrubber and the Go tests run on the build host.
+# The app's unit tests run on the JVM and need the AAR, because the app
+# module links against it.
 test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	python3 -I scripts/scrub-key --self-test
 	cd golib && go test ./...
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	$(GRADLE) -p $(CURDIR) testDebugUnitTest

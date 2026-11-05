@@ -145,7 +145,8 @@ peer_has_app() {
     echo "$machines" | grep -q "^$APP_ADDRESS "
 }
 
-# Copies stdin to stdout with the run's key replaced (scripts/testpeer scrub).
+# Copies stdin to stdout with the run's key replaced (scripts/testpeer
+# scrub), and prints nothing when it cannot.
 scrub() { "$TESTPEER" scrub; }
 
 # Copies the app's log and the VM's edgevpn and console logs into $OUT,
@@ -224,7 +225,8 @@ main() {
     adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/token' <"$("$TESTPEER" key)"
     echo "$peer" | adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/peers'
     local result
-    result=$(adb_ shell am instrument -w -e class com.kairos.edgevpn.NetworkTestSetup "$RUNNER" | scrub)
+    result=$(adb_ shell am instrument -w -e class com.kairos.edgevpn.NetworkTestSetup "$RUNNER" | scrub) ||
+        fail "could not run or scrub the setup step"
     if ! echo "$result" | grep -q "^OK (1 test)"; then
         # Only the lines that say what failed, never the whole output.
         echo "$result" | grep -E "^(FAILURES|There was|[0-9]+\)|Tests run|[a-zA-Z.]*(Error|Exception))" | head -n 20
