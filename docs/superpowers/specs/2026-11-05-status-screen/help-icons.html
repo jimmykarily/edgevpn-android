@@ -30,7 +30,10 @@
   .health .card { flex:1; text-align:center; padding:9px 6px; }
   .health b { display:block; font-size:17px; }
   .health span { font-size:10.5px; color:#6b7280; line-height:1.3; }
-  .q { display:inline-flex; width:14px; height:14px; border-radius:50%; font-size:9.5px; font-weight:700; align-items:center; justify-content:center; border:1.3px solid currentColor; opacity:.7; flex:none; vertical-align:-2px; }
+  .nowrapq { white-space:nowrap; display:inline-flex; align-items:center; gap:.35em; vertical-align:middle; }
+  .q { display:inline-flex; width:1.05em; height:1.05em; min-width:13px; min-height:13px; border-radius:50%; font-size:.72em; font-weight:700; align-items:center; justify-content:center; border:1.3px solid currentColor; opacity:.7; flex:none; line-height:1; box-sizing:border-box; }
+  .withq { display:inline-flex; align-items:center; gap:.35em; }
+  .big .q { font-size:11px; width:17px; height:17px; }
   .hero .q { color:#fff; }
   .hl { outline:2px solid #7c3aed; outline-offset:2px; border-radius:50%; opacity:1; }
   .scrim { position:absolute; inset:0; background:rgba(0,0,0,.35); }
@@ -44,7 +47,7 @@
   .lbl { font-size:10px; font-weight:700; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; margin-bottom:4px; }
 </style>
 
-<h2>(?) next to each plain-language term</h2>
+<h2>(?) next to each plain-language term, aligned</h2>
 <p class="subtitle">Left: where the (?) icons sit on the main screen. They are small and faded so the screen stays calm. Right: what you see after tapping the (?) next to "Via helper": the plain explanation first, then the technical details, with the live values for that device where they exist.</p>
 
 <div class="phones">
@@ -55,11 +58,11 @@
       <div class="appbar">EdgeVPN <span class="ic">⋮</span></div>
       <div class="body">
         <div class="hero">
-          <div class="row"><div class="big">✓ Connected <span class="q">?</span></div><div class="btn">Turn off</div></div>
+          <div class="row"><div class="big withq">✓ Connected <span class="q">?</span></div><div class="btn">Turn off</div></div>
           <div class="small">You can reach 2 of your 3 devices.</div>
           <div class="me">
-            <div>This phone <span class="q">?</span><b>10.1.0.2</b></div>
-            <div>Using <span class="q">?</span><b>Wi-Fi</b></div>
+            <div><span class="withq">This phone <span class="q">?</span></span><b>10.1.0.2</b></div>
+            <div><span class="withq">Using <span class="q">?</span></span><b>Wi-Fi</b></div>
           </div>
         </div>
         <div class="sec">Your devices <span class="q">?</span></div>
@@ -70,8 +73,8 @@
         </div>
         <div class="sec">Finding your devices <span class="q">?</span></div>
         <div class="health">
-          <div class="card"><b>143</b><span>public helpers available <span class="q">?</span></span></div>
-          <div class="card"><b>4 s</b><span>last heard from your network <span class="q">?</span></span></div>
+          <div class="card"><b>143</b><span>public helpers <span class="nowrapq">available <span class="q">?</span></span></span></div>
+          <div class="card"><b>4 s</b><span>last heard from your <span class="nowrapq">network <span class="q">?</span></span></span></div>
         </div>
         <p style="font-size:11px;color:#6b7280;margin:0 4px">(Map left out here to keep the picture short; its legend gets the same (?) icons.)</p>
       </div>
