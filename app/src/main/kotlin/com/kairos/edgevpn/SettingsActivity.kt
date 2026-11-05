@@ -40,8 +40,6 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "EdgeVPN"
 
-
-
         /** Work that reads or writes the encrypted settings, kept off the main thread. */
         private val io = Executors.newSingleThreadExecutor()
     }
