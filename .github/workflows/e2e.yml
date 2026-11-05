@@ -1,0 +1,135 @@
+name: E2E tests
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# A newer push to the same pull request or to main makes the running tests
+# pointless, so they are cancelled.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The screen tests in app/src/androidTest, run on an Android emulator. They
+  # drive the real screens with a chosen network snapshot instead of a
+  # running node, so the job needs no network key and no secret. Joining a
+  # real network is checked by hand on a local emulator, never here.
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # The Makefile's own SDK in binaries/, as in the preview job, and the
+      # emulator is installed into the same SDK. That way there is one adb:
+      # the emulator runner starts the device with it and Gradle talks to the
+      # device with it. A second adb of another version would restart the adb
+      # server and drop the device in the middle of the run.
+      ANDROID_HOME: ${{ github.workspace }}/binaries/android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/binaries/android-sdk
+      # The JDK the Makefile downloads, so the emulator runner's sdkmanager
+      # and avdmanager run on the same Java as the build.
+      JAVA_HOME: ${{ github.workspace }}/binaries/jdk-17
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: golib/go.mod
+          cache-dependency-path: golib/go.sum
+
+      # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
+      # downloads into binaries/, cached like in the preview job. The emulator
+      # and its system image live in the same SDK but are left out here,
+      # because the next cache holds them under a key of their own.
+      - name: Cache the build tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+          key: e2e-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      # The system image is about 1.7GB and the emulator another 800MB, the
+      # same bytes on every run. The key names the exact image, so a change
+      # of API level or architecture fetches once and then caches again under
+      # its own key instead of silently reusing the wrong one.
+      - name: Cache the emulator and system image
+        uses: actions/cache@v5
+        with:
+          path: |
+            binaries/android-sdk/emulator
+            binaries/android-sdk/system-images/android-35/default/x86_64
+          key: android-sdk-emulator-35-default-x86_64
+
+      # The device itself, and the snapshot it boots from. Creating it and
+      # waiting for a first cold boot takes a couple of minutes; restoring
+      # this makes later runs start in seconds.
+      - name: Cache the device and its snapshot
+        uses: actions/cache@v5
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: android-avd-35-default-x86_64
+
+      # The slow part, done before an emulator is running: the Go library for
+      # the phone and the x86_64 emulator, the app and the test APK. This
+      # also installs the SDK that the emulator runner below needs.
+      - name: Build the app and the tests
+        run: make e2e-build
+
+      # The emulator needs hardware acceleration to be usable, and the runner
+      # ships /dev/kvm owned by a group the job's user is not in. This rule
+      # opens it; without it the emulator falls back to software and the job
+      # takes too long to be worth running.
+      - name: Let this job use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Create the device, only when it is not cached
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Device created and snapshotted for the cache."
+
+      # The runner's emulator is emulator-5554, where the Makefile expects
+      # the local one at emulator-5556, so the serial is passed in.
+      - name: Run the screen tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          # The tests read what is on screen, and a view in the middle of an
+          # animation is present but not yet where it will be.
+          disable-animations: true
+          script: make e2e ANDROID_SERIAL=emulator-5554
+
+      - name: Upload the test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-test-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore

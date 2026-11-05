@@ -79,6 +79,8 @@ make e2e      # build with android/amd64 added and run the tests on emulator-555
 
 `make e2e` runs `connectedDebugAndroidTest` on the device named by `ANDROID_SERIAL` (default `emulator-5556`) and turns off its animations first. It installs the debug build, `com.kairos.edgevpn`. Results are in `app/build/reports/androidTests/connected/`.
 
+The **E2E tests** workflow (`.github/workflows/e2e.yml`) runs the same target on every pull request and every push to `main`, on an API 35 x86_64 emulator, and uploads the reports when a test fails. It uses no secrets.
+
 ## Auto-downloaded tools
 
 On first build, the Makefile downloads these into `binaries/` (gitignored):
