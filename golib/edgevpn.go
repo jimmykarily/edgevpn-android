@@ -154,7 +154,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	}
 
 	llger := &bufferLogger{}
-	cfg := networkConfig(token, address)
+	cfg := networkConfig(normalizeToken(token), address)
 
 	SetMinLogLevel(cfg.LogLevel)
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
