@@ -78,7 +78,7 @@ make emu-up   # start the emulator, once
 make e2e      # build with android/amd64 added and run the tests on emulator-5556
 ```
 
-`make e2e` runs `connectedDebugAndroidTest` on the device named by `ANDROID_SERIAL` (default `emulator-5556`) and turns off its animations first. It installs the debug build, `com.kairos.edgevpn`. Results are in `app/build/reports/androidTests/connected/`.
+`make e2e` runs `connectedDebugAndroidTest` on the device named by `ANDROID_SERIAL` (default `emulator-5556`) and turns off its animations first. It installs the debug build, `com.kairos.edgevpn`. Results are in `app/build/reports/androidTests/connected/`. The tests clear the debug app's stored settings, network key included, and Gradle uninstalls the app when they finish, so do not point `ANDROID_SERIAL` at a phone whose debug app you want to keep.
 
 The **E2E tests** workflow (`.github/workflows/e2e.yml`) runs the same target on every pull request and every push to `main`, on an API 35 x86_64 emulator, and uploads the reports when a test fails. It uses no secrets.
 
@@ -107,7 +107,7 @@ make network-test   # build, start the peer if needed, run the check
 
 The script, `scripts/network-test`, stores the peer's temporary key, the address `10.1.0.4` and the peer's libp2p address in the app through an instrumented helper (`NetworkTestSetup`), grants the VPN permission with `appops`, and drives the main screen through `adb`. The app dials the peer directly at `10.0.2.2` (the host as the emulator sees it) instead of looking for it through the public DHT, so it connects in seconds. Because the peer forgets a device after 60 seconds without a heartbeat, the test also makes the app send one every 15 seconds instead of every 120. Neither setting has a screen in the app.
 
-It writes screenshots, the app's log and the peer's edgevpn and console logs into `build/network-test/`. Every log it shows or writes goes through `scripts/scrub-key` first, which removes the key, the secrets inside it and any 12-character piece of either, and which prints nothing if it has no key to scrub with (`make test` runs its self-test). It clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
+It writes screenshots, the app's log and the peer's edgevpn and console logs into `build/network-test/`. Every log it shows or writes (not the screenshots) goes through `scripts/scrub-key` first, which removes the key, the secrets inside it and any 12-character piece of either, and which prints nothing if it has no key to scrub with (`make test` runs its self-test). Screenshots are not scrubbed. They show only the app's screens for this run's throwaway key, and the Join screen, the one screen a key can be typed into, blocks screenshots. It clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
 
 The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
 
