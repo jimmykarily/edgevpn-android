@@ -7,6 +7,7 @@ import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isNotChecked
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -38,8 +39,10 @@ class SettingsScreenTest {
     @Test
     fun anInvalidAddressIsExplainedAndNotSaved() {
         ActivityScenario.launch(SettingsActivity::class.java).use {
-            onView(withId(R.id.addressRow)).perform(nestedScrollTo(), click())
-            onView(withId(R.id.field)).perform(replaceText("10.1.0.256"))
+            // The value, not the row: on a narrow screen the middle of the row is the (?) icon
+            // after the title, which opens the help sheet instead of the editor.
+            onView(withId(R.id.addressValue)).perform(nestedScrollTo(), click())
+            onView(withId(R.id.field)).inRoot(isDialog()).perform(replaceText("10.1.0.256"))
             closeSoftKeyboard()
             onView(withText("Save")).perform(click())
 
