@@ -87,7 +87,11 @@ func buildSnapshot(in snapshotInput) snapshotJSON {
 
 	deviceIDs := map[string]bool{}
 	var newest time.Time
-	for _, m := range in.Machines {
+	// The ledger keys machines by address, so one peer can appear under
+	// several addresses; the smallest address is shown.
+	machines := append([]types.Machine(nil), in.Machines...)
+	sort.SliceStable(machines, func(i, j int) bool { return machines[i].Address < machines[j].Address })
+	for _, m := range machines {
 		if m.PeerID == "" || (in.SelfID != "" && m.PeerID == in.SelfID) ||
 			(in.SelfAddress != "" && m.Address == in.SelfAddress) || deviceIDs[m.PeerID] {
 			continue
@@ -213,10 +217,7 @@ func collectSnapshot() snapshotInput {
 
 // readNetwork fills in the ledger, connection and interface facts of a
 // running node. Each read that fails leaves its part of in empty.
-// A node that is not fully initialised can panic inside the library, which
-// leaves whatever was read before the panic.
 func readNetwork(n *node.Node, in *snapshotInput) {
-	defer func() { _ = recover() }()
 	if h := n.Host(); h != nil {
 		in.SelfID = h.ID().String()
 		for _, id := range h.Network().Peers() {

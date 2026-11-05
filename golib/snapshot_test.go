@@ -188,3 +188,20 @@ func TestLibraryVersionIsNeverEmpty(t *testing.T) {
 		t.Fatal("empty version")
 	}
 }
+
+func TestSnapshotKeepsSmallestAddressForARepeatedPeerID(t *testing.T) {
+	for i := 0; i < 50; i++ {
+		machines := []types.Machine{
+			{PeerID: "desktop", Address: "10.1.0.9", Hostname: "desktop"},
+			{PeerID: "desktop", Address: "10.1.0.1", Hostname: "desktop"},
+			{PeerID: "desktop", Address: "10.1.0.5", Hostname: "desktop"},
+		}
+		if i%2 == 1 {
+			machines[0], machines[2] = machines[2], machines[0]
+		}
+		snap := buildSnapshot(snapshotInput{Machines: machines})
+		if len(snap.Devices) != 1 || snap.Devices[0].Address != "10.1.0.1" {
+			t.Fatalf("devices = %+v, want one at 10.1.0.1", snap.Devices)
+		}
+	}
+}

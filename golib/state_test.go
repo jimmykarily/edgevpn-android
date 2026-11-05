@@ -67,7 +67,7 @@ func TestHandleNodeExitOfTheCurrentSession(t *testing.T) {
 	SetStatusListener(l)
 	t.Cleanup(func() { SetStatusListener(nil); Stop() })
 
-	n := &node.Node{}
+	n := newTestNode(t)
 	tun, _ := newTunPipe(t)
 	cancelled := 0
 	mu.Lock()
@@ -96,14 +96,14 @@ func TestHandleNodeExitOfAStaleSessionLeavesTheNewOneAlone(t *testing.T) {
 	SetStatusListener(l)
 	t.Cleanup(func() { SetStatusListener(nil); Stop() })
 
-	newer := &node.Node{}
+	newer := newTestNode(t)
 	tun, _ := newTunPipe(t)
 	mu.Lock()
 	currentNode, tunFile = newer, tun
 	cancelFn = func() {}
 	mu.Unlock()
 
-	handleNodeExit(&node.Node{}, func() {}, errors.New("boom"))
+	handleNodeExit(newTestNode(t), func() {}, errors.New("boom"))
 
 	if got := Status(); got != "looking" {
 		t.Errorf("Status() = %q, want looking (newer session untouched)", got)
@@ -114,4 +114,14 @@ func TestHandleNodeExitOfAStaleSessionLeavesTheNewOneAlone(t *testing.T) {
 	if len(l.reasons) != 0 {
 		t.Errorf("listener calls = %v, want none", l.reasons)
 	}
+}
+
+// newTestNode returns a node that is never started.
+func newTestNode(t *testing.T) *node.Node {
+	t.Helper()
+	n, err := node.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
