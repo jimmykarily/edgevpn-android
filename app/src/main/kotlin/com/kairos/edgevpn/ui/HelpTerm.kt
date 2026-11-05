@@ -5,10 +5,32 @@ enum class HelpTerm {
     CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, YOUR_DEVICES, DIRECT, VIA_HELPER, OFFLINE,
     SAME_NETWORK, FINDING, HELPERS, LAST_HEARD, NETWORK_KEY, NAME, ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH;
 
-    /** Terms whose live values describe one device's connection rather than this phone. */
-    val aboutConnection: Boolean
-        get() = this == DIRECT || this == VIA_HELPER || this == OFFLINE || this == SAME_NETWORK
+    /** What the live values of this term describe, which names their heading in the sheet. */
+    val liveScope: LiveScope
+        get() = when (this) {
+            DIRECT, VIA_HELPER, OFFLINE, SAME_NETWORK -> LiveScope.CONNECTION
+            YOUR_DEVICES, LAST_HEARD -> LiveScope.NETWORK
+            CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, FINDING, HELPERS, NETWORK_KEY, NAME,
+            ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH -> LiveScope.PHONE
+        }
+
+    /**
+     * For a badge term about [device], the term of the badge the device has now, so a sheet
+     * opened on "Direct" follows the device when it moves to a helper. Other terms stay as they are.
+     */
+    fun followBadge(device: DeviceRow?): HelpTerm =
+        if (device != null && (this == DIRECT || this == VIA_HELPER || this == OFFLINE)) device.badge.helpTerm else this
 }
+
+/** What a help sheet's live values describe: one device's connection, this phone, or the whole network. */
+enum class LiveScope { CONNECTION, PHONE, NETWORK }
+
+val Badge.helpTerm: HelpTerm
+    get() = when (this) {
+        Badge.DIRECT -> HelpTerm.DIRECT
+        Badge.VIA_HELPER -> HelpTerm.VIA_HELPER
+        Badge.OFFLINE -> HelpTerm.OFFLINE
+    }
 
 /** Facts about this phone that the status snapshot does not carry. */
 data class PhoneFacts(val using: String? = null, val detailedLogs: Boolean? = null)

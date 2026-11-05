@@ -41,6 +41,7 @@ import com.kairos.edgevpn.ui.StatusModel
 import com.kairos.edgevpn.ui.Using
 import com.kairos.edgevpn.ui.VpnState
 import com.kairos.edgevpn.ui.appendHelpIcon
+import com.kairos.edgevpn.ui.helpTerm
 import com.kairos.edgevpn.ui.formatAgo
 import com.kairos.edgevpn.ui.liveValues
 import com.kairos.edgevpn.ui.parseStatus
@@ -48,6 +49,7 @@ import com.kairos.edgevpn.ui.pickUsing
 import com.kairos.edgevpn.ui.planScreen
 import com.kairos.edgevpn.ui.showHelp
 import edgevpn.Edgevpn
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -134,8 +136,8 @@ class MainActivity : AppCompatActivity() {
         legendLine(R.id.legendOffline, Badge.OFFLINE)
         helpIcon(R.id.pillThisPhoneLabel, HelpTerm.THIS_PHONE)
         helpIcon(R.id.pillUsingLabel, HelpTerm.USING)
-        helpIcon(R.id.sectionDevices, HelpTerm.YOUR_DEVICES)
-        helpIcon(R.id.sectionFinding, HelpTerm.FINDING)
+        sectionHeader(R.id.sectionDevices, HelpTerm.YOUR_DEVICES)
+        sectionHeader(R.id.sectionFinding, HelpTerm.FINDING)
         devicesSection = findViewById(R.id.devicesSection)
         deviceList = findViewById(R.id.deviceList)
         findingSection = findViewById(R.id.findingSection)
@@ -336,7 +338,7 @@ class MainActivity : AppCompatActivity() {
             val row = inflater.inflate(R.layout.item_device, deviceList, false)
             val badge = row.findViewById<TextView>(R.id.deviceBadge)
             bindBadge(row.findViewById(R.id.deviceIcon), badge, d.badge)
-            badge.appendHelpIcon(badgeTerm(d.badge)) { openHelp(it, d) }
+            badge.appendHelpIcon(d.badge.helpTerm) { openHelp(it, d) }
             row.findViewById<TextView>(R.id.deviceName).text = deviceName(d)
             row.findViewById<TextView>(R.id.deviceLine).text =
                 getString(R.string.device_line, d.address, howText(d.how))
@@ -350,17 +352,18 @@ class MainActivity : AppCompatActivity() {
         line.setCompoundDrawablesRelativeWithIntrinsicBounds(
             LegendLineDrawable(badge, resources.displayMetrics.density), null, null, null,
         )
-        line.appendHelpIcon(badgeTerm(badge)) { openHelp(it) }
+        line.appendHelpIcon(badge.helpTerm) { openHelp(it) }
     }
 
     private fun helpIcon(id: Int, term: HelpTerm) {
         findViewById<TextView>(id).appendHelpIcon(term) { openHelp(it) }
     }
 
-    private fun badgeTerm(b: Badge) = when (b) {
-        Badge.DIRECT -> HelpTerm.DIRECT
-        Badge.VIA_HELPER -> HelpTerm.VIA_HELPER
-        Badge.OFFLINE -> HelpTerm.OFFLINE
+    /** A section header in capitals, set in code so the (?) icon span survives. */
+    private fun sectionHeader(id: Int, term: HelpTerm) {
+        val header = findViewById<TextView>(id)
+        header.text = header.text.toString().uppercase(Locale.getDefault())
+        header.appendHelpIcon(term) { openHelp(it) }
     }
 
     /**
@@ -369,10 +372,11 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openHelp(term: HelpTerm, device: DeviceRow? = null) {
         helpSheet?.dismiss()
-        helpSheet = showHelp(this, term, device?.let { deviceName(it) }) {
+        fun current() = device?.let { d -> lastModel?.devices?.find { it.id == d.id } }
+        helpSheet = showHelp(this, term, device?.let { deviceName(it) }, termNow = { term.followBadge(current()) }) {
             val m = lastModel ?: return@showHelp emptyList()
-            val current = device?.let { d -> m.devices.find { it.id == d.id } }
-            liveValues(term, m, current, PhoneFacts(usingText(), AppSettings.detailedLogs(this)))
+            val now = current()
+            liveValues(term.followBadge(now), m, now, PhoneFacts(usingText(), AppSettings.detailedLogs(this)))
         }
     }
 
