@@ -78,3 +78,37 @@ func TestLogDialErrorIsOnlyKeptWithDetailedLogs(t *testing.T) {
 		t.Fatalf("detailed logs on: logs = %q, want the dial error", got)
 	}
 }
+
+// edgevpn logs the mDNS service name when it starts mDNS, and that name is
+// a secret part of the network key.
+func TestTheMDNSServiceNameIsHiddenInTheLogs(t *testing.T) {
+	resetLogs(t)
+	l := &bufferLogger{}
+	l.Infof("mdns(android): starting, service=%s", "secretservice123")
+	l.Info("some other line, service=keep")
+
+	got := RecentLogs()
+	if strings.Contains(got, "secretservice123") {
+		t.Errorf("logs hold the mDNS service name:\n%s", got)
+	}
+	if !strings.Contains(got, "mdns(android): starting, service=<hidden>") {
+		t.Errorf("logs lost the mDNS start line:\n%s", got)
+	}
+	if !strings.Contains(got, "some other line, service=keep") {
+		t.Errorf("a line that is not about mDNS changed:\n%s", got)
+	}
+}
+
+func TestRedactLine(t *testing.T) {
+	for in, want := range map[string]string{
+		"mdns(android): starting, service=abc":     "mdns(android): starting, service=<hidden>",
+		"mdns(android): starting, service=abc def": "mdns(android): starting, service=<hidden> def",
+		"mdns(android): starting, service=":        "mdns(android): starting, service=<hidden>",
+		"mdns: peer found":                         "mdns: peer found",
+		"unrelated service=abc":                    "unrelated service=abc",
+	} {
+		if got := redactLine(in); got != want {
+			t.Errorf("redactLine(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

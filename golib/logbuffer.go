@@ -140,7 +140,7 @@ func emit(level, msg string) {
 		return
 	}
 	ts := time.Now().Format("15:04:05")
-	line := fmt.Sprintf("[%s] %s %s", ts, level, msg)
+	line := fmt.Sprintf("[%s] %s %s", ts, level, redactLine(msg))
 	ringAppend(line)
 	writeLogcat(level, line)
 }
@@ -180,3 +180,24 @@ func (l *bufferLogger) Fatal(args ...interface{})            { emit("FATAL", joi
 func (l *bufferLogger) Fatalf(f string, args ...interface{}) { emit("FATAL", fmt.Sprintf(f, args...)) }
 func (l *bufferLogger) Panic(args ...interface{})            { emit("PANIC", joinArgs(args...)) }
 func (l *bufferLogger) Panicf(f string, args ...interface{}) { emit("PANIC", fmt.Sprintf(f, args...)) }
+
+// mdnsStartPrefix starts the line edgevpn logs when it starts mDNS. The
+// service name after it is a secret part of the network key.
+const mdnsStartPrefix = "mdns(android): starting, service="
+
+// redactLine hides secrets that edgevpn writes into its log lines, so they
+// reach neither the Logs screen nor logcat. On the mDNS start line it
+// replaces the service name, up to the next space, with "<hidden>".
+func redactLine(msg string) string {
+	i := strings.Index(msg, mdnsStartPrefix)
+	if i < 0 {
+		return msg
+	}
+	start := i + len(mdnsStartPrefix)
+	end := strings.IndexByte(msg[start:], ' ')
+	rest := ""
+	if end >= 0 {
+		rest = msg[start+end:]
+	}
+	return msg[:start] + "<hidden>" + rest
+}
