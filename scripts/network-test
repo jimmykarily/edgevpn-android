@@ -258,6 +258,18 @@ collect_logs() {
     "$TESTPEER" serial >"$OUT/testpeer-serial.log" 2>/dev/null || true
 }
 
+# Every socket the app opens is protected from the VPN through
+# VpnService.protect. The service logs a warning when that returns false.
+no_protect_failures() {
+    local bad
+    bad=$(adb_ logcat -d -b main -v time -s EdgeVpnService:W 2>/dev/null | { grep -F "VpnService.protect(" || true; } | head -n 5)
+    if [ -n "$bad" ]; then
+        echo "$bad" >&2
+        fail "VpnService.protect failed during the run"
+    fi
+    log "no VpnService.protect failures in the app's log so far"
+}
+
 finish() {
     local status=$?
     trap - EXIT
@@ -355,6 +367,8 @@ main() {
     adb_ install -r "$TEST_APK" >/dev/null
     adb_ shell am force-stop "$PACKAGE"
     adb_ shell pm clear "$PACKAGE" >/dev/null
+    # A large buffer keeps the whole run in the log so the checks below see it.
+    adb_ logcat -G 16M
     adb_ logcat -c
 
     # The files go straight from the key file into the app's private
@@ -384,6 +398,7 @@ main() {
     local took
     took=$(wait_for "Connected" "$CONNECT_TIMEOUT") || { shot not-connected; fail "not connected after ${CONNECT_TIMEOUT}s"; }
     log "connected after ${took}s"
+    no_protect_failures
     shot connected
 
     check_vpn_routes
@@ -420,13 +435,7 @@ main() {
         [ "$after" -eq "$sockets" ] || fail "the app has $after listening sockets after off and on, want $sockets as before"
     fi
 
-    # Every socket the app opens is protected from the VPN through
-    # VpnService.protect; a failure shows up in the app's log.
-    if adb_ logcat -d -v time 2>/dev/null | grep -E "VpnService\.protect\([0-9]+\) (returned false|timed out)" | head -n 5 | grep .; then
-        fail "VpnService.protect failed during the run"
-    fi
-    log "no VpnService.protect failures in the app's log"
-
+    no_protect_failures
     shot connected-final
     "$TESTPEER" machines | sed 's/^/[peer machines] /'
 }

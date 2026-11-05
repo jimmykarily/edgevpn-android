@@ -113,6 +113,8 @@ The script, `scripts/network-test`, stores the peer's temporary key, the address
 
 It writes screenshots, the app's log and the peer's edgevpn and console logs into `build/network-test/`. Every log it shows or writes (not the screenshots) goes through `scripts/scrub-key` first, which removes the key, the secrets inside it and any 12-character piece of either, and which prints nothing if it has no key to scrub with (`make test` runs its self-test). Screenshots are not scrubbed. They show only the app's screens for this run's throwaway key, and the Join screen, the one screen a key can be typed into, blocks screenshots. It clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
 
+The test also guards the app's calls to `VpnService.protect`, which keeps the app's own sockets out of the VPN. They run on the dialing thread. In the network test runs protect never failed off the main thread on an API 35 emulator; vendor phone builds are untested. The script enlarges the emulator's log buffer and fails if the app logged `VpnService.protect(...) returned false`, once after the first connect and once at the end. That log line is also the sign to look for on a real phone.
+
 The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
 
 ## Auto-downloaded tools
