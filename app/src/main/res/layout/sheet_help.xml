@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="28dp">
+
+        <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/helpTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_main"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            tools:text="Via helper" />
+
+        <TextView
+            android:id="@+id/helpDevice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_muted"
+            android:textSize="15sp"
+            android:visibility="gone"
+            tools:text="laptop"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/helpPlain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:lineSpacingMultiplier="1.2"
+            android:textColor="@color/text_main"
+            android:textSize="15sp"
+            tools:text="Your phone and the device can't reach each other directly." />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_help_tech"
+            android:orientation="vertical"
+            android:padding="14dp">
+
+            <TextView
+                style="@style/TextAppearance.EdgeVPN.Section"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/help_technical" />
+
+            <TextView
+                android:id="@+id/helpTech"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingMultiplier="1.2"
+                android:textColor="@color/text_main"
+                android:textIsSelectable="true"
+                android:textSize="13sp"
+                tools:text="The connection is a libp2p circuit relay v2 connection." />
+
+            <LinearLayout
+                android:id="@+id/helpLiveGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:id="@+id/helpLiveHeading"
+                    style="@style/TextAppearance.EdgeVPN.Section"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    tools:text="@string/help_live_connection" />
+
+                <TextView
+                    android:id="@+id/helpLive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingMultiplier="1.3"
+                    android:textColor="@color/text_main"
+                    android:textSize="13sp"
+                    tools:text="Limited: yes" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
