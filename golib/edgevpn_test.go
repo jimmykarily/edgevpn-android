@@ -109,3 +109,34 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 		})
 	}
 }
+
+func TestStartWhileRunningClosesDescriptor(t *testing.T) {
+	mu.Lock()
+	cancelFn = func() {}
+	mu.Unlock()
+	t.Cleanup(func() {
+		mu.Lock()
+		cancelFn = nil
+		mu.Unlock()
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	fd, err := syscall.Dup(int(r.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Close()
+
+	if err := Start(fd, "some-token", make([]byte, 32), "10.1.0.2", "test"); err == nil {
+		t.Fatal("Start succeeded while already running")
+	}
+	var st syscall.Stat_t
+	if err := syscall.Fstat(fd, &st); err != syscall.EBADF {
+		syscall.Close(fd)
+		t.Errorf("fstat on the rejected descriptor = %v, want EBADF (closed)", err)
+	}
+}

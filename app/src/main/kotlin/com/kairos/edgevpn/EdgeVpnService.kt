@@ -86,6 +86,11 @@ class EdgeVpnService : VpnService() {
      * must survive the service being destroyed, so onDestroy skips Edgevpn.stop(). */
     private var failed = false
 
+    /** Counts start attempts so a late callback from an earlier one is ignored. */
+    private var session = 0
+
+    private var shownText: String? = null
+
     private val statusTicker = object : Runnable {
         override fun run() {
             val text = when (Edgevpn.status()) {
@@ -93,15 +98,19 @@ class EdgeVpnService : VpnService() {
                 "looking" -> TEXT_LOOKING
                 else -> return
             }
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, buildNotification(text))
+            if (text != shownText) {
+                shownText = text
+                getSystemService(NotificationManager::class.java)
+                    .notify(NOTIFICATION_ID, buildNotification(text))
+            }
             mainHandler.postDelayed(this, TICK_MS)
         }
     }
 
-    private val statusListener = object : StatusListener {
+    private fun newStatusListener(mySession: Int) = object : StatusListener {
         override fun onStopped(reason: String?) {
             mainHandler.post {
+                if (mySession != session) return@post
                 Log.w(TAG, "Node stopped: $reason")
                 failed = true
                 teardown()
@@ -112,6 +121,11 @@ class EdgeVpnService : VpnService() {
     private fun connect() {
         if (tunPfd != null) return
         failed = false
+        session++
+        shownText = TEXT_LOOKING
+        // Called first: a service started with startForegroundService that stops
+        // before this call crashes the app.
+        startForeground(NOTIFICATION_ID, buildNotification(TEXT_LOOKING))
 
         val token = TokenStore.load(this)
         if (token == null) {
@@ -137,10 +151,8 @@ class EdgeVpnService : VpnService() {
             return
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification(TEXT_LOOKING))
-
         Edgevpn.setDetailedLogs(AppSettings.detailedLogs(this))
-        Edgevpn.setStatusListener(statusListener)
+        Edgevpn.setStatusListener(newStatusListener(session))
 
         val pfd = Builder()
             .addAddress(address, 24)
@@ -179,7 +191,7 @@ class EdgeVpnService : VpnService() {
             Log.i(TAG, "VPN started")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start VPN", e)
-            failStart("The network key could not be used: " + e.message)
+            failStart("The VPN could not start with this network key. The logs have the details.")
         }
     }
 
@@ -200,6 +212,7 @@ class EdgeVpnService : VpnService() {
     private fun teardown() {
         isRunning = false
         tunPfd = null
+        Edgevpn.setStatusListener(null)
         mainHandler.removeCallbacks(statusTicker)
         multicastLock?.let {
             if (it.isHeld) it.release()

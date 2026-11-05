@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -128,6 +129,8 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	defer mu.Unlock()
 
 	if cancelFn != nil {
+		// The caller handed over ownership of fd, so a rejected start closes it.
+		syscall.Close(fd)
 		return fmt.Errorf("already running")
 	}
 
