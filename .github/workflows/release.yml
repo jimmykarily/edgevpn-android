@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# gh release create needs write access to the repository to publish a
+# release and attach the APK to it.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the release APK
+    runs-on: ubuntu-latest
+    env:
+      # See preview.yml: keeps the Makefile off the runner's own Android SDK.
+      ANDROID_HOME: ${{ github.workspace }}/binaries/android-sdk
+      # Not a secret, see preview.yml.
+      EDGEVPN_RELEASE_KEY_ALIAS: edgevpn
+    steps:
+      - uses: actions/checkout@v7
+
+      # Without this check a missing secret fails deep inside Gradle's
+      # keystore loading with nothing about secrets in the message. It runs
+      # first, so it fails before any time goes into downloading tools.
+      - name: Check the signing secrets are set
+        env:
+          EDGEVPN_RELEASE_KEYSTORE_BASE64: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_BASE64 }}
+          EDGEVPN_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_PASSWORD }}
+          EDGEVPN_RELEASE_KEY_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEY_PASSWORD }}
+        run: |
+          missing=""
+          for name in EDGEVPN_RELEASE_KEYSTORE_BASE64 EDGEVPN_RELEASE_KEYSTORE_PASSWORD EDGEVPN_RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing repository secret(s):$missing" >&2
+            echo "See 'Signing' in README.md for how to set them." >&2
+            exit 1
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: golib/go.mod
+          cache-dependency-path: golib/go.sum
+
+      - name: Cache the build tools
+        uses: actions/cache@v5
+        with:
+          path: binaries
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      # versionName and versionCode come from this, in app/build.gradle.kts.
+      # The leading v of the tag is not part of the version.
+      - name: Read the version from the tag
+        run: echo "EDGEVPN_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      # Decoded into the runner's temp directory, never the checkout, and
+      # removed once the build is done, whether or not it succeeded.
+      - name: Write the keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build the signed release APK
+        env:
+          EDGEVPN_RELEASE_KEYSTORE: ${{ runner.temp }}/release.keystore
+          EDGEVPN_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_PASSWORD }}
+          EDGEVPN_RELEASE_KEY_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEY_PASSWORD }}
+        run: |
+          make release
+          mv app/build/outputs/apk/release/app-release.apk \
+            "app/build/outputs/apk/release/edgevpn-$GITHUB_REF_NAME.apk"
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      # Named for the tag, with the tag's own message as its notes. The
+      # release may already exist: one made in the web interface creates the
+      # tag that starts this run, and a re-run arrives after its own earlier
+      # attempt made one. So an existing release gets the APK added, and
+      # --clobber lets a re-run replace the APK it uploaded before.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "A release for $GITHUB_REF_NAME already exists; adding the APK to it."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --notes-from-tag
+          fi
+          gh release upload "$GITHUB_REF_NAME" \
+            "app/build/outputs/apk/release/edgevpn-$GITHUB_REF_NAME.apk" \
+            --clobber
