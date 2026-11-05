@@ -48,9 +48,13 @@ make install      # build + push APK to USB-connected device
 | `make app` | Build the Android debug APK |
 | `make preview` | Build the preview APK (`com.kairos.edgevpn.preview`, installs next to a release) |
 | `make release` | Build the release APK (signed only when the signing variables below are set) |
+| `make test` | Run the scrub-key self-test, the Go tests and the app's JVM unit tests |
+| `make lint` | Run Android lint on the debug build; fails on errors, warnings go to `app/build/reports/` |
 | `make install` | Build + install APK on USB-connected device via adb |
 | `make clean` | Remove build outputs |
 | `make distclean` | Remove build outputs and all downloaded tools (`binaries/`) |
+
+The **Unit tests** workflow (`.github/workflows/test.yml`) runs `make test` and `make lint` on every pull request and every push to `main`. It needs no device and no secrets.
 
 ## Emulator
 

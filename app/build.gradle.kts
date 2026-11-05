@@ -105,6 +105,13 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // make lint, and CI through it, fails on lint errors only. Warnings
+    // are in the report.
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+    }
 }
 
 dependencies {
