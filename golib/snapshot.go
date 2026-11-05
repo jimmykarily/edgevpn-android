@@ -142,7 +142,7 @@ func deviceFor(m types.Machine, in snapshotInput) deviceJSON {
 	d.Remote = endpointOf(best.Remote)
 	if reach == "direct" {
 		if ip, err := manet.ToIP(best.Remote); err == nil {
-			d.SameNetwork = sameNetwork(ip, in.LocalNets)
+			d.SameNetwork = sameNetwork(ip, in.LocalNets, net.ParseIP(in.SelfAddress))
 		}
 	}
 	return d

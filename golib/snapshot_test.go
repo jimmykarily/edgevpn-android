@@ -41,6 +41,23 @@ func TestSnapshotExcludesThisPhoneByIDAndByAddress(t *testing.T) {
 	}
 }
 
+func TestSnapshotDoesNotCountTheVPNSubnetAsSameNetwork(t *testing.T) {
+	_, tun, _ := net.ParseCIDR("10.1.0.2/24")
+	snap := buildSnapshot(snapshotInput{
+		State:       "connected",
+		Now:         time.Unix(1793890000, 0),
+		SelfAddress: "10.1.0.2",
+		Machines:    []types.Machine{{PeerID: "desktop", Address: "10.1.0.1", Hostname: "desktop"}},
+		Conns: map[string][]connInfo{
+			"desktop": {{Remote: mustMA(t, "/ip4/10.1.0.9/tcp/4001"), Opened: time.Unix(1793884950, 0)}},
+		},
+		LocalNets: []*net.IPNet{tun},
+	})
+	if len(snap.Devices) != 1 || snap.Devices[0].SameNetwork {
+		t.Fatalf("devices = %+v, want one device not on the same network", snap.Devices)
+	}
+}
+
 func TestSnapshotDeviceFields(t *testing.T) {
 	now := time.Unix(1793890000, 0)
 	opened := time.Unix(1793884950, 0)

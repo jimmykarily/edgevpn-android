@@ -85,21 +85,26 @@ func TestIsRelayed(t *testing.T) {
 	}
 }
 
+var vpnAddress = net.ParseIP("10.1.0.2")
+
 func TestSameNetwork(t *testing.T) {
 	_, wifi, _ := net.ParseCIDR("192.168.0.0/23")
 	_, v6, _ := net.ParseCIDR("2a02:1388:2a25:5d1e::/64")
 	local := []*net.IPNet{wifi, v6}
-	if !sameNetwork(net.ParseIP("192.168.1.73"), local) {
+	if !sameNetwork(net.ParseIP("192.168.1.73"), local, vpnAddress) {
 		t.Error("LAN IPv4 not same network")
 	}
-	if sameNetwork(net.ParseIP("10.106.78.113"), local) {
+	if sameNetwork(net.ParseIP("10.106.78.113"), local, vpnAddress) {
 		t.Error("other private subnet counted as same network")
 	}
-	if sameNetwork(net.ParseIP("84.247.173.168"), local) {
+	if sameNetwork(net.ParseIP("84.247.173.168"), local, vpnAddress) {
 		t.Error("public IPv4 counted as same network")
 	}
-	if sameNetwork(net.ParseIP("2a02:1388:2a25:5d1e::5"), local) {
-		t.Error("global IPv6 counted as same network")
+	if !sameNetwork(net.ParseIP("2a02:1388:2a25:5d1e::5"), local, vpnAddress) {
+		t.Error("global IPv6 in the phone's prefix not same network")
+	}
+	if sameNetwork(net.ParseIP("2a02:dead::5"), local, vpnAddress) {
+		t.Error("global IPv6 outside the phone's prefixes counted as same network")
 	}
 }
 
@@ -107,23 +112,42 @@ func TestSameNetworkIPv6LocalAddresses(t *testing.T) {
 	_, ula, _ := net.ParseCIDR("fd12:3456::/64")
 	_, linkLocal, _ := net.ParseCIDR("fe80::/64")
 	local := []*net.IPNet{ula, linkLocal}
-	if !sameNetwork(net.ParseIP("fd12:3456::7"), local) {
+	if !sameNetwork(net.ParseIP("fd12:3456::7"), local, vpnAddress) {
 		t.Error("ULA address in the local ULA prefix not same network")
 	}
-	if !sameNetwork(net.ParseIP("fe80::1234"), local) {
+	if !sameNetwork(net.ParseIP("fe80::1234"), local, vpnAddress) {
 		t.Error("link-local address in a local link-local prefix not same network")
 	}
-	if sameNetwork(net.ParseIP("fd99::7"), local) {
+	if sameNetwork(net.ParseIP("fd99::7"), local, vpnAddress) {
 		t.Error("ULA address outside the local prefixes counted as same network")
+	}
+}
+
+func TestSameNetworkIgnoresHostOnlyPrefixes(t *testing.T) {
+	v6Host := &net.IPNet{IP: net.ParseIP("2a02:1388:2a25:5d1e::5"), Mask: net.CIDRMask(128, 128)}
+	v4Host := &net.IPNet{IP: net.ParseIP("192.168.1.73").To4(), Mask: net.CIDRMask(32, 32)}
+	local := []*net.IPNet{v6Host, v4Host}
+	if sameNetwork(net.ParseIP("2a02:1388:2a25:5d1e::5"), local, vpnAddress) {
+		t.Error("a /128 local address counted as a network")
+	}
+	if sameNetwork(net.ParseIP("192.168.1.73"), local, vpnAddress) {
+		t.Error("a /32 local address counted as a network")
+	}
+}
+
+func TestSameNetworkIgnoresTheVPNSubnet(t *testing.T) {
+	_, tun, _ := net.ParseCIDR("10.1.0.0/24")
+	if sameNetwork(net.ParseIP("10.1.0.1"), []*net.IPNet{tun}, vpnAddress) {
+		t.Error("an address in the VPN's own subnet counted as same network")
 	}
 }
 
 func TestSameNetworkRejectsNilAndEmpty(t *testing.T) {
 	_, wifi, _ := net.ParseCIDR("192.168.0.0/23")
-	if sameNetwork(nil, []*net.IPNet{wifi}) {
+	if sameNetwork(nil, []*net.IPNet{wifi}, vpnAddress) {
 		t.Error("nil IP counted as same network")
 	}
-	if sameNetwork(net.ParseIP("192.168.1.73"), nil) {
+	if sameNetwork(net.ParseIP("192.168.1.73"), nil, vpnAddress) {
 		t.Error("no local networks still matched")
 	}
 }
