@@ -39,11 +39,20 @@ class EdgeVpnService : VpnService() {
     private var multicastLock: WifiManager.MulticastLock? = null
 
     /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
-     * protect() is a binder call to the system, so it works from any thread. Calling it
-     * from the dialing thread keeps dials from waiting on the main thread. */
+     * It runs on the calling thread: protect() is a binder call to the system, and a hop
+     * to the main thread would make every dial wait for the main looper. protect never
+     * failed off the main thread in the network test runs on an API 35 emulator; vendor
+     * phone builds are untested, so a "VpnService.protect(...) returned false" log line
+     * is the sign to look for. A Java exception thrown into a gomobile callback aborts
+     * the process, so any failure is reported as false instead. */
     private val socketProtector = object : SocketProtector {
         override fun protect(fd: Long): Boolean {
-            val ok = this@EdgeVpnService.protect(fd.toInt())
+            val ok = try {
+                this@EdgeVpnService.protect(fd.toInt())
+            } catch (t: Throwable) {
+                Log.w(TAG, "VpnService.protect($fd) threw $t")
+                return false
+            }
             if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
             return ok
         }
@@ -211,6 +220,7 @@ class EdgeVpnService : VpnService() {
         isRunning = false
         tunPfd = null
         Edgevpn.setStatusListener(null)
+        Edgevpn.setSocketProtector(null)
         mainHandler.removeCallbacks(statusTicker)
         multicastLock?.let {
             if (it.isHeld) it.release()
