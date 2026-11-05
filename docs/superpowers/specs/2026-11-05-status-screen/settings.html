@@ -1,0 +1,95 @@
+<style>
+  .phones { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; margin-top:18px; align-items:flex-start; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .col h3 { margin:0; font-size:16px; }
+  .col p.desc { margin:0; max-width:300px; font-size:13px; color:#555; text-align:center; line-height:1.4; }
+  .phone { width:300px; height:700px; border-radius:34px; background:#111; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .screen { width:100%; height:100%; border-radius:26px; background:#f6f7fb; overflow:hidden; display:flex; flex-direction:column; font-family:Roboto, system-ui, sans-serif; color:#1b1d23; }
+  .sb { height:22px; font-size:11px; display:flex; justify-content:space-between; padding:4px 16px 0; color:#333; }
+  .appbar { padding:6px 16px 10px; font-size:18px; font-weight:600; display:flex; gap:14px; align-items:center; }
+  .appbar .ic { font-size:18px; color:#444; }
+  .body { flex:1; overflow:hidden; padding:0 12px; display:flex; flex-direction:column; gap:8px; }
+  .sec { font-size:11px; font-weight:700; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; margin:6px 4px 0; }
+  .card { background:#fff; border-radius:16px; padding:2px 14px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .item { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid #eef0f4; }
+  .item:last-child { border-bottom:0; }
+  .item .ico { width:30px; height:30px; border-radius:10px; background:#e0f2f1; display:flex; align-items:center; justify-content:center; font-size:14px; flex:none; }
+  .item .t { flex:1; min-width:0; }
+  .item .n { font-size:13.5px; font-weight:600; }
+  .item .s { font-size:11.5px; color:#6b7280; line-height:1.35; }
+  .item .v { font-size:12px; color:#0d9488; font-weight:600; white-space:nowrap; }
+  .tog { width:36px; height:20px; border-radius:999px; background:#cbd5e1; position:relative; flex:none; }
+  .tog::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; }
+  .tog.on { background:#0d9488; } .tog.on::after { left:18px; }
+  .netcard { border-radius:18px; padding:14px 16px; color:#fff; background:linear-gradient(135deg,#0d9488,#0f766e); }
+  .netcard .big { font-size:16px; font-weight:700; }
+  .netcard .small { font-size:12px; opacity:.9; margin-top:3px; line-height:1.4; }
+  .netcard .acts { display:flex; gap:8px; margin-top:12px; }
+  .netcard .acts span { background:rgba(255,255,255,.2); padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; }
+  .danger { color:#b91c1c; }
+  .new { font-size:9.5px; font-weight:700; color:#7c3aed; background:#ede9fe; padding:2px 6px; border-radius:6px; margin-left:6px; vertical-align:2px; }
+  .field { border:1.5px solid #0d9488; border-radius:12px; padding:10px; font-size:11.5px; color:#9ca3af; min-height:70px; background:#fff; font-family:monospace; }
+  .btnp { background:#0d9488; color:#fff; text-align:center; padding:10px; border-radius:999px; font-size:13px; font-weight:600; }
+  .btns { color:#0d9488; text-align:center; padding:8px; font-size:13px; font-weight:600; }
+  .hint { font-size:11.5px; color:#6b7280; line-height:1.45; }
+  .err { font-size:11.5px; color:#b91c1c; }
+</style>
+
+<h2>Settings</h2>
+<p class="subtitle">Left: settings once you have joined a network. Right: the first-time screen, when no network is set up yet. Items marked <span class="new" style="margin:0">NEW</span> need work in the app beyond the screen itself; the rest exists today.</p>
+
+<div class="phones">
+
+  <div class="col">
+    <div class="phone"><div class="screen">
+      <div class="sb"><span>15:19</span><span>Wi-Fi ▾ 🔋</span></div>
+      <div class="appbar"><span class="ic">←</span> Settings</div>
+      <div class="body">
+        <div class="netcard">
+          <div class="big">🔑 You're part of a network</div>
+          <div class="small">This phone joined with a network key. Anyone with the same key can join too, so keep it private.</div>
+          <div class="acts"><span>Replace key</span><span>Leave network</span></div>
+        </div>
+
+        <div class="sec">This phone</div>
+        <div class="card">
+          <div class="item"><div class="ico">🏷</div><div class="t"><div class="n">Name <span class="new">NEW</span></div><div class="s">What your other devices see. Shows as "localhost" today.</div></div><div class="v">Redmi Note 9 Pro</div></div>
+          <div class="item"><div class="ico">📍</div><div class="t"><div class="n">Address in your network <span class="new">NEW</span></div><div class="s">Other devices reach this phone here.</div></div><div class="v">10.1.0.2</div></div>
+        </div>
+
+        <div class="sec">Troubleshooting</div>
+        <div class="card">
+          <div class="item"><div class="ico">📜</div><div class="t"><div class="n">View logs</div><div class="s">What the app has been doing, step by step.</div></div><div class="v">›</div></div>
+          <div class="item"><div class="ico">🔍</div><div class="t"><div class="n">Detailed logs <span class="new">NEW</span></div><div class="s">Much more detail. Uses more battery; turn off when done.</div></div><div class="tog"></div></div>
+          <div class="item"><div class="ico">🪪</div><div class="t"><div class="n">Phone ID</div><div class="s">12D3KooWB2mB…xUS5 · tap to copy</div></div><div class="v">⧉</div></div>
+        </div>
+
+        <div class="sec">About</div>
+        <div class="card">
+          <div class="item"><div class="ico">ℹ</div><div class="t"><div class="n">Version</div><div class="s">0.1.0-preview · EdgeVPN 0.35.5</div></div></div>
+        </div>
+      </div>
+    </div></div>
+    <h3>Joined a network</h3>
+    <p class="desc">The network key is never shown, only whether one is set. "Leave network" asks for confirmation first.</p>
+  </div>
+
+  <div class="col">
+    <div class="phone"><div class="screen">
+      <div class="sb"><span>15:19</span><span>Wi-Fi ▾ 🔋</span></div>
+      <div class="appbar"><span class="ic">←</span> Join a network</div>
+      <div class="body">
+        <div style="font-size:30px;text-align:center;margin-top:6px">🔑</div>
+        <div style="font-size:16px;font-weight:700;text-align:center">Paste your network key</div>
+        <div class="hint" style="text-align:center">You get it from a device that is already in the network: it is the same token your computer uses to run EdgeVPN.</div>
+        <div class="field">Paste the key here…</div>
+        <div class="err">⚠ This doesn't look like a complete key. It may have been cut off while copying. <span class="new">NEW</span></div>
+        <div class="btnp">Join network</div>
+        <div class="btns">Scan QR code instead <span class="new">NEW</span></div>
+      </div>
+    </div></div>
+    <h3>First time</h3>
+    <p class="desc">Explains where the key comes from, and catches a key that was cut off while copying (which happened to us today).</p>
+  </div>
+
+</div>

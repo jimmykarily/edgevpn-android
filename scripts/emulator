@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+#
+# Drives a headless Android emulator for testing the app without a
+# phone attached.
+#
+# Headless means no window, ever: the emulator draws into a software
+# renderer and is reached only through adb. Nothing appears on the desktop
+# unless "up-windowed" is asked for by name.
+#
+# The emulator reaches the internet through the host's NAT and is never on
+# the host's local network, so a peer on this machine is reached over the
+# internet like any other.
+
+set -euo pipefail
+
+# The emulator and system image live in a user-wide SDK. ANDROID_HOME is not
+# used because the Makefile points it at this repo's own SDK.
+ANDROID_HOME="${EDGEVPN_EMULATOR_SDK:-$HOME/Android/Sdk}"
+# One adb for everything: a second adb of another version fights over the
+# server port. This repo's own SDK holds the adb the Makefile uses.
+ADB="${EDGEVPN_ADB:-$(cd "$(dirname "$0")/.." && pwd)/binaries/android-sdk/platform-tools/adb}"
+EMULATOR="$ANDROID_HOME/emulator/emulator"
+AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+AVD_NAME="${EDGEVPN_AVD:-edgevpn}"
+IMAGE="system-images;android-35;default;x86_64"
+PORT="${EDGEVPN_AVD_PORT:-5556}"
+SERIAL="emulator-$PORT"
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/edgevpn-emulator"
+PID_FILE="$STATE_DIR/$AVD_NAME.pid"
+LOG_FILE="$STATE_DIR/$AVD_NAME.log"
+
+# How long to wait for a cold boot. A first boot on a software renderer is
+# slow; later boots come up from the saved snapshot in a few seconds.
+BOOT_TIMEOUT_SECONDS="${EDGEVPN_BOOT_TIMEOUT:-300}"
+
+APK="app/build/outputs/apk/preview/app-preview.apk"
+PACKAGE="com.kairos.edgevpn.preview"
+
+die() {
+    echo "emulator: $*" >&2
+    exit 1
+}
+
+require_tools() {
+    [ -x "$EMULATOR" ] || die "no emulator at $EMULATOR. Run: make emu-setup"
+    [ -x "$ADB" ] || die "no adb at $ADB. Run: make emu-setup (it downloads this repo's SDK)"
+}
+
+# True while a process we started is still alive. The pid file outlives a
+# crash, so the pid is checked rather than trusted.
+running() {
+    [ -f "$PID_FILE" ] || return 1
+    local pid
+    pid=$(cat "$PID_FILE")
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+booted() {
+    [ "$("$ADB" -s "$SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]
+}
+
+wait_for_boot() {
+    local waited=0
+    while [ "$waited" -lt "$BOOT_TIMEOUT_SECONDS" ]; do
+        if booted; then
+            # The boot flag flips before the launcher is drawing. Settling
+            # here keeps the first screenshot from catching a black screen.
+            "$ADB" -s "$SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
+            return 0
+        fi
+        running || die "emulator exited during boot. Last lines of $LOG_FILE:
+$(tail -20 "$LOG_FILE" 2>/dev/null)"
+        sleep 2
+        waited=$((waited + 2))
+    done
+    die "not booted after ${BOOT_TIMEOUT_SECONDS}s. See $LOG_FILE"
+}
+
+cmd_setup() {
+    # The SDK is shared with other projects' emulators, so it is left alone
+    # when it already has what this one needs.
+    if [ ! -x "$EMULATOR" ] || [ ! -d "$ANDROID_HOME/system-images/android-35/default/x86_64" ]; then
+        [ -x "$SDKMANAGER" ] || die "no sdkmanager at $SDKMANAGER"
+        yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+        "$SDKMANAGER" --install "emulator" "$IMAGE"
+    fi
+
+    if "$AVDMANAGER" list avd 2>/dev/null | grep -q "Name: $AVD_NAME\$"; then
+        echo "avd $AVD_NAME already exists"
+        return 0
+    fi
+
+    # A named device profile rather than the default, so the screen is a
+    # size somebody actually holds and a layout that only fails on a real
+    # phone fails here too. Falls back if this SDK does not carry it.
+    local device="pixel_6"
+    "$AVDMANAGER" list device 2>/dev/null | grep -q "id: .*\"$device\"" || device="pixel"
+
+    echo "no" | "$AVDMANAGER" create avd \
+        --name "$AVD_NAME" \
+        --package "$IMAGE" \
+        --device "$device" >/dev/null
+    echo "created avd $AVD_NAME on $device"
+}
+
+start() {
+    local windowed="$1"
+    require_tools
+    if running; then
+        echo "already running as $SERIAL"
+        booted || wait_for_boot
+        return 0
+    fi
+
+    mkdir -p "$STATE_DIR"
+    local args=(
+        -avd "$AVD_NAME"
+        -port "$PORT"
+        -no-audio
+        -no-boot-anim
+    )
+    if [ "$windowed" = "no" ]; then
+        # swiftshader_indirect renders in software, which is what makes a
+        # window unnecessary. Asking for host GPU without a display fails.
+        args+=(-no-window -gpu swiftshader_indirect)
+    fi
+
+    ANDROID_HOME="$ANDROID_HOME" ANDROID_SDK_ROOT="$ANDROID_HOME" \
+        nohup "$EMULATOR" "${args[@]}" >"$LOG_FILE" 2>&1 &
+    echo $! >"$PID_FILE"
+
+    "$ADB" start-server >/dev/null 2>&1 || true
+    wait_for_boot
+    echo "$SERIAL booted"
+}
+
+cmd_down() {
+    if ! running; then
+        rm -f "$PID_FILE"
+        echo "not running"
+        return 0
+    fi
+    # Asked to stop through adb rather than killed, so the quick boot
+    # snapshot is written and the next start takes seconds.
+    "$ADB" -s "$SERIAL" emu kill >/dev/null 2>&1 || kill "$(cat "$PID_FILE")" 2>/dev/null || true
+    local waited=0
+    while running && [ "$waited" -lt 30 ]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    running && kill -9 "$(cat "$PID_FILE")" 2>/dev/null || true
+    rm -f "$PID_FILE"
+    echo "stopped"
+}
+
+cmd_status() {
+    if ! running; then
+        echo "stopped"
+        return 1
+    fi
+    if booted; then
+        echo "running and booted as $SERIAL"
+    else
+        echo "running as $SERIAL, still booting"
+    fi
+}
+
+cmd_install() {
+    require_tools
+    running || die "not running. Run: make emu-up"
+    [ -f "$APK" ] || die "no apk at $APK. Run: make preview"
+    "$ADB" -s "$SERIAL" install -r "$APK"
+}
+
+cmd_launch() {
+    "$ADB" -s "$SERIAL" shell monkey -p "$PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null
+    echo "launched $PACKAGE"
+}
+
+cmd_stop_app() {
+    "$ADB" -s "$SERIAL" shell am force-stop "$PACKAGE"
+    echo "stopped $PACKAGE"
+}
+
+cmd_shot() {
+    local out="${1:-screenshot.png}"
+    "$ADB" -s "$SERIAL" exec-out screencap -p >"$out"
+    echo "$out"
+}
+
+# The screen as text: every node with its bounds, its text and whether it
+# can be tapped. Cheaper to read than a picture and exact about what is
+# on screen, which is what a check like "is the button within the visible
+# area" needs. The text of editable fields is replaced by its length, so a
+# secret typed into one is never printed, and the dump is removed from the
+# device afterwards.
+cmd_ui() {
+    "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/ui.xml >/dev/null
+    "$ADB" -s "$SERIAL" shell cat /sdcard/ui.xml | python3 -I -c '
+import re, sys
+xml = sys.stdin.read()
+def redact(m):
+    node = m.group(0)
+    if "class=\"android.widget.EditText\"" not in node and "password=\"true\"" not in node:
+        return node
+    return re.sub(r"\btext=\"([^\"]*)\"", lambda t: "text=\"redacted (%d chars)\"" % len(t.group(1)), node, count=1)
+sys.stdout.write(re.sub(r"<node [^>]*>", redact, xml))
+'
+    "$ADB" -s "$SERIAL" shell rm -f /sdcard/ui.xml
+}
+
+cmd_logs() {
+    "$ADB" -s "$SERIAL" logcat -d -v brief "AndroidRuntime:E" "$PACKAGE:V" "*:S"
+}
+
+cmd_reset() {
+    cmd_down >/dev/null 2>&1 || true
+    rm -rf "$HOME/.android/avd/$AVD_NAME.avd/snapshots"
+    echo "snapshots cleared, next start is a cold boot"
+}
+
+usage() {
+    cat <<'USAGE'
+usage: scripts/emulator <command>
+
+  setup         install the emulator and system image, create the avd
+  up            start headless and wait until booted
+  up-windowed   start with a window, for watching it directly
+  down          stop, saving a snapshot so the next start is quick
+  status        whether it is running and booted
+  reset         clear snapshots so the next start is a cold boot
+
+  install       install the preview apk onto it
+  launch        start the app
+  stop-app      force stop the app
+  shot [file]   write a screenshot png (default screenshot.png)
+  ui            print the screen as a view hierarchy
+  logs          recent app and crash log lines
+USAGE
+}
+
+case "${1:-}" in
+    setup) cmd_setup ;;
+    up) start no ;;
+    up-windowed) start yes ;;
+    down) cmd_down ;;
+    status) cmd_status ;;
+    reset) cmd_reset ;;
+    install) cmd_install ;;
+    launch) cmd_launch ;;
+    stop-app) cmd_stop_app ;;
+    shot) cmd_shot "${2:-screenshot.png}" ;;
+    ui) cmd_ui ;;
+    logs) cmd_logs ;;
+    *) usage; exit 1 ;;
+esac

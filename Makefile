@@ -32,6 +32,10 @@ MOBILE_VER := $(shell cd golib && go list -m -f '{{.Version}}' golang.org/x/mobi
 MOBILE_BIN := $(BINARIES)/gomobile-$(MOBILE_VER)
 GOMOBILE   := $(MOBILE_BIN)/gomobile
 
+# Architectures the Go library is built for. The emulator needs android/amd64
+# as well; emu-run sets it.
+GOMOBILE_TARGETS ?= android/arm64
+
 # ── Outputs ──────────────────────────────────────────────────────
 GOLIB_AAR  := app/libs/edgevpn.aar
 APK        := app/build/outputs/apk/debug/app-debug.apk
@@ -40,11 +44,20 @@ GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod golib/go.sum
 APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
 SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 
+# The stamp records GOMOBILE_TARGETS and is rewritten only when they differ,
+# so the AAR is rebuilt exactly when they change. make -n leaves it alone.
+TARGETS_STAMP := build/gomobile-targets.stamp
+$(TARGETS_STAMP): FORCE
+	@mkdir -p build
+	@[ "$$(cat $@ 2>/dev/null)" = "$(GOMOBILE_TARGETS)" ] || echo "$(GOMOBILE_TARGETS)" > $@
+
+FORCE:
+
 # Delete targets whose recipes fail, so stale/empty files don't block rebuilds.
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean
+.PHONY: all golib app preview release test lint install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test FORCE
 
 all: app
 
@@ -100,13 +113,13 @@ $(GOMOBILE):
 # //go:linkname to patch Go's internal net.zoneCache for Android DNS fixes.
 # Go 1.23+ rejects this by default. Disable the check until anet is fixed
 # upstream: https://github.com/wlynxg/anet/issues/11
-$(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
+$(GOLIB_AAR): $(GO_SOURCES) $(TARGETS_STAMP) | $(GOMOBILE) $(SDK_STAMP)
 	@echo "==> Building Go library (gomobile bind)..."
 	@mkdir -p app/libs
 	cd golib && \
 	  PATH=$(MOBILE_BIN):$(JAVA_HOME)/bin:$$PATH \
 	  ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VER) \
-	  $(GOMOBILE) bind -target android/arm64 -androidapi $(MIN_SDK) \
+	  $(GOMOBILE) bind -target $(GOMOBILE_TARGETS) -androidapi $(MIN_SDK) \
 	    -ldflags="-checklinkname=0" \
 	    -o $(CURDIR)/$(GOLIB_AAR) .
 
@@ -137,12 +150,100 @@ release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	@ls app/build/outputs/apk/release/*.apk
 
 # ── Tests ────────────────────────────────────────────────────────
-# The Go tests run on the build host. The app's unit tests run on the JVM
-# and need the AAR, because the app module links against it.
+# The network test's key scrubber and the Go tests run on the build host.
+# The app's unit tests run on the JVM and need the AAR, because the app
+# module links against it.
 test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	python3 -I scripts/scrub-key --self-test
 	cd golib && go test ./...
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	$(GRADLE) -p $(CURDIR) testDebugUnitTest
+
+# Android lint on the debug build. It fails on errors and lists warnings in
+# app/build/reports/lint-results-debug.html.
+lint: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	$(GRADLE) -p $(CURDIR) lintDebug
+
+# ── Emulator ─────────────────────────────────────────────────────
+# A headless emulator (AVD "edgevpn", serial emulator-5556) driven by
+# scripts/emulator. emu-run builds with android/amd64 added, because the
+# emulator is x86_64.
+emu-setup: $(SDK_STAMP)
+	scripts/emulator setup
+
+emu-up:
+	scripts/emulator up
+
+emu-down:
+	scripts/emulator down
+
+emu-status:
+	scripts/emulator status
+
+emu-run:
+	$(MAKE) preview GOMOBILE_TARGETS=android/arm64,android/amd64
+	scripts/emulator install
+	scripts/emulator launch
+
+emu-shot:
+	scripts/emulator shot
+
+# ── Screen tests on an emulator ─────────────────────────────────
+# The tests in app/src/androidTest drive the real screens with a chosen
+# network snapshot instead of a running node, so they need no network key.
+# They run against the debug build on the device named by ANDROID_SERIAL,
+# which is the emulator from emu-up unless set otherwise; CI sets it to the
+# emulator it starts. The Go library is built with android/amd64 added,
+# because the emulator is x86_64.
+ANDROID_SERIAL ?= emulator-5556
+E2E_TARGETS    := android/arm64,android/amd64
+
+# Builds the app and the test APK without a device, so CI can do the slow
+# part before it starts an emulator.
+e2e-build:
+	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
+
+e2e:
+	$(MAKE) e2e-run GOMOBILE_TARGETS=$(E2E_TARGETS)
+
+.PHONY: e2e-apks e2e-run
+e2e-apks: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	$(GRADLE) -p $(CURDIR) assembleDebug assembleDebugAndroidTest
+
+# Animations are turned off on the device first: the tests read the screen,
+# and a sheet halfway through sliding in is not where it will be. This is the
+# SDK's own adb, the one Gradle and scripts/emulator use, because a second adb
+# of another version restarts the adb server under them.
+e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	for s in window_animation_scale transition_animation_scale animator_duration_scale; do \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0 || exit 1; \
+	done
+	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
+
+# ── Test peer ────────────────────────────────────────────────────
+# A disposable QEMU VM running edgevpn with a temporary key, driven by
+# scripts/testpeer, as the second device for real-network checks.
+peer-up:
+	scripts/testpeer up
+
+peer-down:
+	scripts/testpeer down
+
+peer-status:
+	scripts/testpeer status
+
+# ── Network test ─────────────────────────────────────────────────
+# The debug app on the emulator named by ANDROID_SERIAL joins the test
+# peer's network, pings it both ways, turns off for longer than the peer's
+# ownership TTL and checks that traffic comes back after turning on again.
+# scripts/network-test starts the peer when it is not running.
+# NETWORK_TEST_LONG=0 skips the off/on part.
+network-test:
+	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
+	ANDROID_SERIAL=$(ANDROID_SERIAL) scripts/network-test
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)

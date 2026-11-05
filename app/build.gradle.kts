@@ -53,6 +53,7 @@ android {
         versionCode = releaseVersionCode
         versionName = releaseVersionName
         manifestPlaceholders["appLabel"] = "EdgeVPN"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -97,8 +98,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    // make lint, and CI through it, fails on lint errors only. Warnings
+    // are in the report.
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
     }
 }
 
@@ -107,7 +119,15 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+
+    // The screen tests in src/androidTest, which make e2e runs on an emulator.
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }

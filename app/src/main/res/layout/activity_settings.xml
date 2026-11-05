@@ -1,73 +1,385 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/screen_bg"
+    android:orientation="vertical">
 
-    <LinearLayout
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/screen_bg"
+        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:title="@string/settings_title"
+        app:titleTextAppearance="@style/TextAppearance.EdgeVPN.Toolbar" />
 
-        <!-- Shown when no token is saved: paste field + save button -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
         <LinearLayout
-            android:id="@+id/tokenInputGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="20dp">
 
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- Network card -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/token_hint">
+                android:background="@drawable/bg_card_network"
+                android:orientation="vertical"
+                android:paddingStart="18dp"
+                android:paddingTop="16dp"
+                android:paddingEnd="18dp"
+                android:paddingBottom="16dp">
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/tokenInput"
+                <TextView
+                    android:id="@+id/netTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:drawablePadding="8dp"
+                    android:gravity="center_vertical"
+                    android:textColor="#FFFFFF"
+                    android:textSize="19sp"
+                    android:textStyle="bold"
+                    app:drawableStartCompat="@drawable/ic_key"
+                    app:drawableTint="#FFFFFF"
+                    tools:text="@string/net_joined_title" />
+
+                <TextView
+                    android:id="@+id/netKey"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="textMultiLine"
-                    android:minLines="3"
-                    android:maxLines="6"
-                    android:fontFamily="monospace"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="4dp"
+                    android:alpha="0.92"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    tools:text="@string/net_joined_key" />
 
-            </com.google.android.material.textfield.TextInputLayout>
+                <TextView
+                    android:id="@+id/netMore"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.92"
+                    android:lineSpacingMultiplier="1.1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    tools:text="@string/net_joined_private" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/saveButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/save_token" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
 
-        </LinearLayout>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/replaceKeyButton"
+                        style="@style/Widget.EdgeVPN.CardButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:text="@string/net_replace_key" />
 
-        <!-- Shown when a token is already saved -->
-        <LinearLayout
-            android:id="@+id/tokenSavedGroup"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/leaveButton"
+                        style="@style/Widget.EdgeVPN.CardButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/net_leave" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView
+                style="@style/TextAppearance.EdgeVPN.Section"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/token_configured"
-                android:textSize="16sp" />
+                android:layout_marginStart="6dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/section_this_phone" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/deleteButton"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.EdgeVPN.WhiteCard"
                 android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/nameRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_label" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/nameTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_name"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_name_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/nameValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:ellipsize="end"
+                            android:maxWidth="160dp"
+                            android:maxLines="2"
+                            android:textAlignment="viewEnd"
+                            android:textAppearance="@style/TextAppearance.EdgeVPN.RowValue"
+                            tools:text="Redmi Note 9 Pro" />
+                    </LinearLayout>
+
+                    <View style="@style/Widget.EdgeVPN.SettingsDivider" />
+
+                    <LinearLayout
+                        android:id="@+id/addressRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_place" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/addressTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_address"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_address_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/addressValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:textAppearance="@style/TextAppearance.EdgeVPN.RowValue"
+                            tools:text="10.1.0.2" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                style="@style/TextAppearance.EdgeVPN.Section"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/delete_token"
-                android:textColor="#D32F2F" />
+                android:layout_marginStart="6dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/section_troubleshooting" />
 
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.EdgeVPN.WhiteCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/logsRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_article" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_view_logs"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_view_logs_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="10dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/text_muted" />
+                    </LinearLayout>
+
+                    <View style="@style/Widget.EdgeVPN.SettingsDivider" />
+
+                    <LinearLayout
+                        android:id="@+id/detailedLogsRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_search" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/detailedLogsTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_detailed_logs"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_detailed_logs_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/detailedLogsSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp" />
+                    </LinearLayout>
+
+                    <View style="@style/Widget.EdgeVPN.SettingsDivider" />
+
+                    <LinearLayout
+                        android:id="@+id/phoneIdRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_id_card" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/phoneIdTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_phone_id"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:id="@+id/phoneIdValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub"
+                                tools:text="12D3KooW…xUS5 · tap to copy" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="10dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_copy"
+                            app:tint="@color/teal" />
+                    </LinearLayout>
+
+                    <View style="@style/Widget.EdgeVPN.SettingsDivider" />
+
+                    <LinearLayout
+                        android:id="@+id/startFreshRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_delete"
+                            app:tint="@color/danger" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/startFreshTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_start_fresh"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle"
+                                android:textColor="@color/danger" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_start_fresh_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                style="@style/TextAppearance.EdgeVPN.Section"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/section_about" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.EdgeVPN.WhiteCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    style="@style/Widget.EdgeVPN.SettingsRow"
+                    android:background="@null">
+
+                    <ImageView
+                        style="@style/Widget.EdgeVPN.SettingsIcon"
+                        android:src="@drawable/ic_info" />
+
+                    <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/setting_version"
+                            android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                        <TextView
+                            android:id="@+id/versionValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub"
+                            android:textIsSelectable="true"
+                            tools:text="0.1.0-preview · EdgeVPN 0.35.5" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
-
-    </LinearLayout>
-
-</ScrollView>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

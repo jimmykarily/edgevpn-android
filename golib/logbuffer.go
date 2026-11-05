@@ -2,16 +2,20 @@ package edgevpn
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 )
 
 // LogDialError logs a dial failure to the app log (and thus logcat) so we can
 // see the underlying error (e.g. connection refused, permission denied).
-// Uses WARN level so it is not dropped when min log level is "warn".
+// Each dial is logged at DEBUG: a node dials hundreds of peers while it
+// bootstraps, and these lines would push the startup lines out of the buffer.
 func LogDialError(addr string, err error) {
 	if err != nil {
-		emit("WARN ", fmt.Sprintf("dial error %s: %v", addr, err))
+		emit("DEBUG", fmt.Sprintf("dial error %s: %v", addr, err))
 	}
 }
 
@@ -63,23 +67,72 @@ func shouldEmit(level string) bool {
 	return lv >= minVal
 }
 
-// LogReceiver is implemented on the Android side to receive log lines in
-// real time. gomobile generates a Java interface that Kotlin can implement.
-type LogReceiver interface {
-	OnLog(line string)
+// logBufferLines is the number of most recent log lines kept in memory.
+const logBufferLines = 2000
+
+var (
+	ringMu    sync.Mutex
+	ring      [logBufferLines]string
+	ringStart int // index of the oldest line
+	ringLen   int
+)
+
+func ringAppend(line string) {
+	ringMu.Lock()
+	defer ringMu.Unlock()
+	if ringLen < logBufferLines {
+		ring[(ringStart+ringLen)%logBufferLines] = line
+		ringLen++
+		return
+	}
+	ring[ringStart] = line
+	ringStart = (ringStart + 1) % logBufferLines
+}
+
+// RecentLogs returns the buffered log lines, oldest first, joined with newlines.
+func RecentLogs() string {
+	ringMu.Lock()
+	defer ringMu.Unlock()
+	lines := make([]string, ringLen)
+	for i := range lines {
+		lines[i] = ring[(ringStart+i)%logBufferLines]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// ClearLogs empties the log buffer.
+func ClearLogs() {
+	ringMu.Lock()
+	defer ringMu.Unlock()
+	ring = [logBufferLines]string{}
+	ringStart, ringLen = 0, 0
 }
 
 var (
-	receiverMu sync.Mutex
-	receiver   LogReceiver
+	detailedLogs   bool
+	detailedLogsMu sync.Mutex
 )
 
-// SetLogReceiver registers (or unregisters with nil) a callback that receives
-// every log line as it is emitted.
-func SetLogReceiver(r LogReceiver) {
-	receiverMu.Lock()
-	defer receiverMu.Unlock()
-	receiver = r
+// SetDetailedLogs turns debug output on or off for the app and for the
+// libraries it uses (libp2p logs through go-log).
+func SetDetailedLogs(on bool) {
+	detailedLogsMu.Lock()
+	detailedLogs = on
+	detailedLogsMu.Unlock()
+	if on {
+		SetMinLogLevel("debug")
+		logging.SetAllLoggers(logging.LevelDebug)
+	} else {
+		SetMinLogLevel("info")
+		logging.SetAllLoggers(logging.LevelError)
+	}
+}
+
+// DetailedLogs reports whether detailed logs are on.
+func DetailedLogs() bool {
+	detailedLogsMu.Lock()
+	defer detailedLogsMu.Unlock()
+	return detailedLogs
 }
 
 func emit(level, msg string) {
@@ -87,15 +140,9 @@ func emit(level, msg string) {
 		return
 	}
 	ts := time.Now().Format("15:04:05")
-	line := fmt.Sprintf("[%s] %s %s", ts, level, msg)
-
-	receiverMu.Lock()
-	r := receiver
-	receiverMu.Unlock()
-
-	if r != nil {
-		r.OnLog(line)
-	}
+	line := fmt.Sprintf("[%s] %s %s", ts, level, redactLine(msg))
+	ringAppend(line)
+	writeLogcat(level, line)
 }
 
 func joinArgs(args ...interface{}) string {
@@ -114,20 +161,43 @@ func joinArgs(args ...interface{}) string {
 }
 
 // bufferLogger implements log.StandardLogger from github.com/ipfs/go-log,
-// pushing each log line to the registered LogReceiver callback.
+// sending each log line through emit.
 type bufferLogger struct{}
 
-func (l *bufferLogger) Debug(args ...interface{})              { emit("DEBUG", joinArgs(args...)) }
-func (l *bufferLogger) Debugf(f string, args ...interface{})   { emit("DEBUG", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Info(args ...interface{})               { emit("INFO ", joinArgs(args...)) }
-func (l *bufferLogger) Infof(f string, args ...interface{})    { emit("INFO ", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Warn(args ...interface{})               { emit("WARN ", joinArgs(args...)) }
-func (l *bufferLogger) Warnf(f string, args ...interface{})    { emit("WARN ", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Warning(args ...interface{})            { emit("WARN ", joinArgs(args...)) }
-func (l *bufferLogger) Warningf(f string, args ...interface{}) { emit("WARN ", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Error(args ...interface{})              { emit("ERROR", joinArgs(args...)) }
-func (l *bufferLogger) Errorf(f string, args ...interface{})   { emit("ERROR", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Fatal(args ...interface{})              { emit("FATAL", joinArgs(args...)) }
-func (l *bufferLogger) Fatalf(f string, args ...interface{})   { emit("FATAL", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Panic(args ...interface{})              { emit("PANIC", joinArgs(args...)) }
-func (l *bufferLogger) Panicf(f string, args ...interface{})   { emit("PANIC", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Debug(args ...interface{})            { emit("DEBUG", joinArgs(args...)) }
+func (l *bufferLogger) Debugf(f string, args ...interface{}) { emit("DEBUG", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Info(args ...interface{})             { emit("INFO ", joinArgs(args...)) }
+func (l *bufferLogger) Infof(f string, args ...interface{})  { emit("INFO ", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Warn(args ...interface{})             { emit("WARN ", joinArgs(args...)) }
+func (l *bufferLogger) Warnf(f string, args ...interface{})  { emit("WARN ", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Warning(args ...interface{})          { emit("WARN ", joinArgs(args...)) }
+func (l *bufferLogger) Warningf(f string, args ...interface{}) {
+	emit("WARN ", fmt.Sprintf(f, args...))
+}
+func (l *bufferLogger) Error(args ...interface{})            { emit("ERROR", joinArgs(args...)) }
+func (l *bufferLogger) Errorf(f string, args ...interface{}) { emit("ERROR", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Fatal(args ...interface{})            { emit("FATAL", joinArgs(args...)) }
+func (l *bufferLogger) Fatalf(f string, args ...interface{}) { emit("FATAL", fmt.Sprintf(f, args...)) }
+func (l *bufferLogger) Panic(args ...interface{})            { emit("PANIC", joinArgs(args...)) }
+func (l *bufferLogger) Panicf(f string, args ...interface{}) { emit("PANIC", fmt.Sprintf(f, args...)) }
+
+// mdnsStartPrefix starts the line edgevpn logs when it starts mDNS. The
+// service name after it is a secret part of the network key.
+const mdnsStartPrefix = "mdns(android): starting, service="
+
+// redactLine hides secrets that edgevpn writes into its log lines, so they
+// reach neither the Logs screen nor logcat. On the mDNS start line it
+// replaces the service name, up to the next space, with "<hidden>".
+func redactLine(msg string) string {
+	i := strings.Index(msg, mdnsStartPrefix)
+	if i < 0 {
+		return msg
+	}
+	start := i + len(mdnsStartPrefix)
+	end := strings.IndexByte(msg[start:], ' ')
+	rest := ""
+	if end >= 0 {
+		rest = msg[start+end:]
+	}
+	return msg[:start] + "<hidden>" + rest
+}

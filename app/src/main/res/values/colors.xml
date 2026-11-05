@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="teal">#0D9488</color>
+    <color name="screen_bg">#F6F7FB</color>
+    <color name="text_main">#1B1D23</color>
+    <color name="text_muted">#6B7280</color>
+    <color name="divider">#EEF0F4</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="map_glow">#E0F2F1</color>
+    <color name="help_tech_bg">#F1F3F6</color>
+    <color name="danger">#B91C1C</color>
+    <color name="network_end">#0F766E</color>
+
+    <color name="on_card_button">#38FFFFFF</color>
+    <color name="on_card_pill">#2EFFFFFF</color>
+
+    <color name="direct_bg">#DCFCE7</color>
+    <color name="direct_fg">#166534</color>
+    <color name="helper_bg">#FEF3C7</color>
+    <color name="helper_fg">#92400E</color>
+    <color name="offline_bg">#ECEEF2</color>
+    <color name="offline_fg">#6B7280</color>
+
+    <color name="connected_start">#16A34A</color>
+    <color name="connected_end">#0D9488</color>
+    <color name="looking_start">#D97706</color>
+    <color name="looking_end">#EA580C</color>
+    <color name="off_start">#64748B</color>
+    <color name="off_end">#475569</color>
+    <color name="problem_start">#DC2626</color>
+    <color name="problem_end">#B91C1C</color>
+</resources>
