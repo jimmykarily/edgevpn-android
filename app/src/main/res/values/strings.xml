@@ -44,7 +44,13 @@
     <string name="vpn_permission_denied">The VPN needs your permission to start.</string>
 
     <!-- Main screen: sections -->
-    <string name="map_description">Map of your devices</string>
+    <string name="map_description">Map of your devices: %1$d reachable, %2$d offline</string>
+    <string name="map_you">You</string>
+    <string name="map_more">more</string>
+    <string name="map_more_count">+%1$d</string>
+    <string name="legend_direct">direct</string>
+    <string name="legend_via_helper">via helper</string>
+    <string name="legend_offline">offline</string>
     <string name="section_devices">Your devices</string>
     <string name="section_finding">Finding your devices</string>
     <plurals name="tile_helpers">

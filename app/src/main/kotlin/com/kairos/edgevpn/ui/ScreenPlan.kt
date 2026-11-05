@@ -11,6 +11,10 @@ data class ScreenPlan(
     val showPills: Boolean,
     val showAddressPill: Boolean,
     val showMap: Boolean,
+    /** The words under the map that explain its line styles; only useful when devices are drawn. */
+    val showMapLegend: Boolean,
+    /** The map draws only the phone with a pulsing ring while looking for devices. */
+    val mapLooking: Boolean,
     val showDevices: Boolean,
     val showTiles: Boolean,
     val secondTile: SecondTile,
@@ -35,6 +39,8 @@ fun planScreen(m: StatusModel): ScreenPlan {
         showPills = m.state != VpnState.OFF,
         showAddressPill = m.state != VpnState.OFF && m.selfAddress.isNotEmpty(),
         showMap = running,
+        showMapLegend = m.state == VpnState.CONNECTED,
+        mapLooking = m.state == VpnState.LOOKING,
         showDevices = running && m.devices.isNotEmpty(),
         showTiles = running,
         secondTile = secondTile,

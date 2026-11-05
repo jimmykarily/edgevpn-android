@@ -47,6 +47,22 @@ class ScreenPlanTest {
     }
 
     @Test
+    fun theMapLegendShowsOnlyWhenTheMapHasDevicesToExplain() {
+        val devices = listOf(row("1", Badge.DIRECT))
+        assertTrue(planScreen(model(VpnState.CONNECTED, devices)).showMapLegend)
+        assertFalse(planScreen(model(VpnState.LOOKING, devices)).showMapLegend)
+        assertFalse(planScreen(model(VpnState.OFF, devices)).showMapLegend)
+        assertFalse(planScreen(model(VpnState.PROBLEM, devices)).showMapLegend)
+    }
+
+    @Test
+    fun onlyTheLookingMapPulses() {
+        assertTrue(planScreen(model(VpnState.LOOKING)).mapLooking)
+        assertFalse(planScreen(model(VpnState.CONNECTED, listOf(row("1", Badge.DIRECT)))).mapLooking)
+        assertFalse(planScreen(model(VpnState.OFF)).mapLooking)
+    }
+
+    @Test
     fun connectedWithOneDeviceSaysYourDevice() {
         assertTrue(planScreen(model(VpnState.CONNECTED, listOf(row("1", Badge.DIRECT)))).onlyDevice)
     }
