@@ -19,6 +19,10 @@ var (
 	failedAt    time.Time
 	selfAddress string
 	selfName    string
+	// hostReady is true once edgevpn has created the current session's
+	// libp2p host. Before that, Node.Host is written by the node goroutine
+	// without synchronization and must not be read.
+	hostReady bool
 )
 
 // StatusListener is told when the VPN stops without Stop being called.

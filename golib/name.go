@@ -2,8 +2,10 @@ package edgevpn
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/mudler/edgevpn/pkg/blockchain"
 	"github.com/mudler/edgevpn/pkg/node"
 	"github.com/mudler/edgevpn/pkg/protocol"
 	"github.com/mudler/edgevpn/pkg/types"
@@ -32,19 +34,33 @@ func nameUpdate(existing types.Machine, found bool, selfID, name string) (types.
 	return existing, true
 }
 
-// announceName keeps the phone's entry in the machines bucket named with the
-// chosen name until ctx is done.
-func announceName(ctx context.Context, n *node.Node) error {
-	ledger, err := n.Ledger()
-	if err != nil {
-		return err
+// markHostReady records that edgevpn has created n's host, so the host can
+// be read safely. It reports false when n is not the current session.
+func markHostReady(n *node.Node) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	if currentNode != n {
+		return false
 	}
+	hostReady = true
+	return true
+}
+
+// hostReadyService is registered as a network service. edgevpn runs it after
+// the host exists; it marks the host ready and starts the name announcement.
+// It returns at once.
+func hostReadyService(ctx context.Context, _ node.Config, n *node.Node, ledger *blockchain.Ledger) error {
+	if markHostReady(n) {
+		announceName(ctx, n, ledger)
+	}
+	return nil
+}
+
+// announceName keeps the phone's entry in the machines bucket named with the
+// chosen name until ctx is done. The host of n must be ready.
+func announceName(ctx context.Context, n *node.Node, ledger *blockchain.Ledger) {
 	ledger.Announce(ctx, nameAnnounceInterval, func() {
-		host := n.Host()
-		if host == nil {
-			return
-		}
-		selfID := host.ID().String()
+		selfID := n.Host().ID().String()
 		mu.Lock()
 		address, name := selfAddress, selfName
 		mu.Unlock()
@@ -55,6 +71,7 @@ func announceName(ctx context.Context, n *node.Node) error {
 		var machine types.Machine
 		if found {
 			if err := data.Unmarshal(&machine); err != nil {
+				emit("WARN ", fmt.Sprintf("cannot read the machines entry of %s: %v", address, err))
 				return
 			}
 		}
@@ -62,5 +79,4 @@ func announceName(ctx context.Context, n *node.Node) error {
 			ledger.Add(protocol.MachinesLedgerKey, map[string]interface{}{address: updated})
 		}
 	})
-	return nil
 }

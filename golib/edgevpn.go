@@ -167,6 +167,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	// The Alive options must come before the VPN service options: the VPN
 	// service blocks in its packet loop, so services after it never start.
 	nodeOpts = append(nodeOpts, services.Alive(aliveAnnounce, aliveScrub, aliveMax)...)
+	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService))
 
 	// Inject a protected TCP transport so every socket fd is passed through
 	// VpnService.protect() before connect/bind. This prevents the VPN's own
@@ -246,11 +247,8 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	ctx, cancel := context.WithCancel(context.Background())
 	cancelFn = cancel
 	currentNode = n
+	hostReady = false
 	startedAt = time.Now()
-
-	if err := announceName(ctx, n); err != nil {
-		emit("WARN ", fmt.Sprintf("name announcement not started: %v", err))
-	}
 
 	go func() {
 		emit("INFO ", "node.Start: entering (blocks in VPN service readPackets loop)")
@@ -280,6 +278,7 @@ func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
 		}
 		currentNode = nil
 		cancelFn = nil
+		hostReady = false
 		recordFailure(err.Error())
 	}
 	mu.Unlock()
@@ -311,6 +310,7 @@ func Stop() {
 	failedAt = time.Time{}
 	currentNode = nil
 	startedAt = time.Time{}
+	hostReady = false
 	selfAddress = ""
 	selfName = ""
 	if tunFile != nil {
