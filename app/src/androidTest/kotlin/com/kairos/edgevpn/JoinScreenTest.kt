@@ -14,6 +14,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import edgevpn.Edgevpn
+import java.security.SecureRandom
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,7 +36,7 @@ class JoinScreenTest {
 
     @Test
     fun aCutOffKeyIsExplainedAndNotSaved() {
-        val key = fakeKey()
+        val key = temporaryKey()
         assertEquals("the uncut key is valid, so only the cut makes it fail", "", Edgevpn.validateToken(key))
         val cut = key.dropLast(5)
 
@@ -52,25 +53,31 @@ class JoinScreenTest {
     }
 
     /**
-     * A network key in the shape edgevpn writes, with made-up OTP keys, room and rendezvous.
-     * It joins no real network, and nothing in the test ever connects with it.
+     * A temporary network key in the shape edgevpn writes, made fresh for each run: random OTP keys
+     * (43 base64url characters, as edgevpn makes them), a random room, rendezvous and mDNS name.
+     * Nothing in the test ever connects with it, and no key is stored in the repository.
      */
-    private fun fakeKey(): String {
+    private fun temporaryKey(): String {
         val yaml = """
             otp:
               dht:
                 interval: 9000
-                key: e2etestdhtkeyfornothingreal
-                length: 32
+                key: ${random()}
+                length: 43
               crypto:
                 interval: 9000
-                key: e2etestcryptokeyfornothingreal
-                length: 32
-            room: e2e-test-room
-            rendezvous: e2e-test-rendezvous
-            mdns: e2e-test-mdns
+                key: ${random()}
+                length: 43
+            room: ${random()}
+            rendezvous: ${random()}
+            mdns: ${random()}
             max_message_size: 20971520
         """.trimIndent() + "\n"
         return Base64.encodeToString(yaml.toByteArray(), Base64.NO_WRAP)
+    }
+
+    private fun random(): String {
+        val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        return Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
     }
 }

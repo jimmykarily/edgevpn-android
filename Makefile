@@ -211,7 +211,7 @@ e2e-apks: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	for s in window_animation_scale transition_animation_scale animator_duration_scale; do \
-	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0; \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0 || exit 1; \
 	done
 	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
 
