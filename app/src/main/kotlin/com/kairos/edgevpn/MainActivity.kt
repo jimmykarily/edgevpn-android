@@ -56,6 +56,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "EdgeVPN"
         private const val POLL_MS = 2000L
+
+        /** Set by the Join screen after it saved a key: start the VPN now. */
+        const val EXTRA_CONNECT = "connect"
     }
 
     private lateinit var statusCardBody: View
@@ -154,6 +157,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
         seeLogsButton.setOnClickListener { showLogsComingSoon() }
+        if (savedInstanceState == null) connectIfAsked(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        connectIfAsked(intent)
+    }
+
+    /** Joining a network sends the user here to start the VPN with the new key. */
+    private fun connectIfAsked(intent: Intent) {
+        if (!intent.getBooleanExtra(EXTRA_CONNECT, false)) return
+        intent.removeExtra(EXTRA_CONNECT)
+        if (!EdgeVpnService.isRunning) connect()
     }
 
     override fun onStart() {
@@ -202,7 +219,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun connect() {
         if (TokenStore.load(this) == null) {
-            openSettings()
+            startActivity(Intent(this, JoinActivity::class.java))
             return
         }
         val intent = VpnService.prepare(this)

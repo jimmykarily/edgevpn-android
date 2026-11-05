@@ -40,14 +40,7 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "EdgeVPN"
 
-        /** Opens the screen with the network key dialog showing. */
-        private const val EXTRA_OPEN_JOIN = "open_join"
 
-        /** How often a reconnect checks whether the VPN has stopped before starting it again. */
-        private const val RECONNECT_POLL_MS = 200L
-
-        /** The pause between the VPN stopping and starting again, so the old service is gone first. */
-        private const val RECONNECT_PAUSE_MS = 500L
 
         /** Work that reads or writes the encrypted settings, kept off the main thread. */
         private val io = Executors.newSingleThreadExecutor()
@@ -120,10 +113,6 @@ class SettingsActivity : AppCompatActivity() {
         renderNetwork()
         renderPhone()
         loadPhoneId()
-
-        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_OPEN_JOIN, false)) {
-            showKeyDialog()
-        }
     }
 
     override fun onDestroy() {
@@ -222,34 +211,9 @@ class SettingsActivity : AppCompatActivity() {
         )
     }
 
-    /**
-     * Stops the VPN, waits until the service has let go of it, and starts it again, so it comes
-     * up with the settings as they are now. It uses the application context, so leaving the
-     * screen does not cancel it.
-     */
-    private fun reconnect() {
-        val app = applicationContext
-        stopVpn(app)
-        val main = Handler(Looper.getMainLooper())
-        val startWhenStopped = object : Runnable {
-            override fun run() {
-                if (EdgeVpnService.isRunning) {
-                    main.postDelayed(this, RECONNECT_POLL_MS)
-                    return
-                }
-                main.postDelayed({
-                    app.startForegroundService(
-                        Intent(app, EdgeVpnService::class.java).setAction(EdgeVpnService.ACTION_CONNECT)
-                    )
-                }, RECONNECT_PAUSE_MS)
-            }
-        }
-        main.postDelayed(startWhenStopped, RECONNECT_POLL_MS)
-    }
+    private fun reconnect() = VpnControl.reconnect(applicationContext)
 
-    private fun stopVpn(c: Context) {
-        c.startService(Intent(c, EdgeVpnService::class.java).setAction(EdgeVpnService.ACTION_DISCONNECT))
-    }
+    private fun stopVpn(c: Context) = VpnControl.stop(c)
 
     private fun confirmLeave() {
         show(
@@ -292,37 +256,18 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * Opens the place where the user enters a network key. With [clearBackStack] the screens
-     * behind this one are closed first, and the main screen with this one on top opens fresh.
+     * Opens the Join screen. With [clearBackStack] the screens behind this one are closed first,
+     * and the main screen with Join on top opens fresh.
      */
     private fun openJoin(clearBackStack: Boolean) {
         if (!clearBackStack) {
-            showKeyDialog()
+            startActivity(Intent(this, JoinActivity::class.java))
             return
         }
         TaskStackBuilder.create(this)
             .addNextIntent(Intent(this, MainActivity::class.java))
-            .addNextIntent(Intent(this, SettingsActivity::class.java).putExtra(EXTRA_OPEN_JOIN, true))
+            .addNextIntent(Intent(this, JoinActivity::class.java))
             .startActivities()
-    }
-
-    private fun showKeyDialog() {
-        showFieldDialog(
-            title = R.string.join_title,
-            hint = getString(R.string.join_hint),
-            text = "",
-            helper = getString(R.string.net_none_where),
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS,
-            positive = R.string.net_join,
-        ) { entered ->
-            val problem = Edgevpn.validateToken(entered)
-            if (problem.isNotEmpty()) return@showFieldDialog problem
-            TokenStore.save(this, entered.filterNot { it.isWhitespace() })
-            Toast.makeText(this, R.string.join_saved, Toast.LENGTH_SHORT).show()
-            renderNetwork()
-            null
-        }
     }
 
     /**
@@ -335,7 +280,6 @@ class SettingsActivity : AppCompatActivity() {
         text: String,
         helper: String?,
         inputType: Int,
-        positive: Int = R.string.dialog_save,
         onSave: (String) -> String?,
     ) {
         val view = layoutInflater.inflate(R.layout.dialog_field, null)
@@ -358,7 +302,7 @@ class SettingsActivity : AppCompatActivity() {
                 .setTitle(title)
                 .setView(view)
                 .setNegativeButton(R.string.dialog_cancel, null)
-                .setPositiveButton(positive, null),
+                .setPositiveButton(R.string.dialog_save, null),
             keyboard = true,
         )
         // Set here rather than on the builder, so an error keeps the dialog open.

@@ -9,7 +9,7 @@
     <string name="net_joined_private">Anyone with the same key can join too, so keep it private.</string>
     <string name="net_none_title">No network yet</string>
     <string name="net_none_key">To join, you need the network key.</string>
-    <string name="net_none_where">You get it from a device that is already in the network: it is the same token your computer uses to run EdgeVPN.</string>
+    <string name="net_none_where">You get it from a device that is already in the network: it is the same network key your computer uses to run EdgeVPN.</string>
     <string name="net_replace_key">Replace key</string>
     <string name="net_leave">Leave network</string>
     <string name="net_join">Join network</string>
@@ -52,7 +52,11 @@
     <string name="reconnect_later">Later</string>
     <string name="join_title">Join a network</string>
     <string name="join_hint">Paste the key here…</string>
-    <string name="join_saved">Network key saved</string>
+    <string name="join_heading">Paste your network key</string>
+    <string name="join_scan">Scan QR code instead</string>
+    <string name="join_scan_prompt">Point the camera at the QR code of your network key</string>
+    <string name="join_camera_denied">The camera is needed to scan a QR code. You can paste the key instead.</string>
+    <string name="reconnect_key_text">Reconnect now to use the new key?</string>
 
     <!-- Main screen: menu -->
     <string name="menu_settings">Settings</string>
