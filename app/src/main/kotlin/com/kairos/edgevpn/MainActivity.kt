@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity() {
                 MainButton.TURN_ON, MainButton.TRY_AGAIN -> connect()
             }
         }
-        seeLogsButton.setOnClickListener { showLogsComingSoon() }
+        seeLogsButton.setOnClickListener { openLogs() }
         if (savedInstanceState == null) connectIfAsked(intent)
     }
 
@@ -203,14 +203,14 @@ class MainActivity : AppCompatActivity() {
             true
         }
         R.id.menu_logs -> {
-            showLogsComingSoon()
+            openLogs()
             true
         }
         else -> super.onOptionsItemSelected(item)
     }
 
-    private fun showLogsComingSoon() {
-        Toast.makeText(this, R.string.logs_coming, Toast.LENGTH_SHORT).show()
+    private fun openLogs() {
+        startActivity(Intent(this, LogsActivity::class.java))
     }
 
     private fun openSettings() {

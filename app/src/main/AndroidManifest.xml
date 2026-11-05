@@ -32,6 +32,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".LogsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".JoinActivity"
             android:exported="false" />
 

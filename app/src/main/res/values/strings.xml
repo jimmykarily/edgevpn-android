@@ -61,7 +61,11 @@
     <!-- Main screen: menu -->
     <string name="menu_settings">Settings</string>
     <string name="menu_logs">Logs</string>
-    <string name="logs_coming">Logs are coming in a later update</string>
+    <string name="logs_title">Logs</string>
+    <string name="logs_copy_all">Copy all</string>
+    <string name="logs_copied">Logs copied</string>
+    <string name="logs_empty">Nothing has been logged yet.</string>
+    <string name="logs_detailed_note">Network library details are in the developer log (logcat).</string>
 
     <!-- Main screen: status card -->
     <string name="state_off_title">VPN is off</string>
