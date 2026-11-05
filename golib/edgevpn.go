@@ -38,36 +38,37 @@ func (l *loggingDialer) DialContext(ctx context.Context, network, address string
 }
 
 var (
-	mu          sync.Mutex
-	cancelFn    context.CancelFunc
-	tunFile     *os.File
-	vpnState    = "disconnected"
-	nodePrivKey []byte // generated once, reused across Stop/Start cycles to keep stable Node ID
+	mu       sync.Mutex
+	cancelFn context.CancelFunc
+	tunFile  *os.File
+	vpnState = "disconnected"
 )
 
-// Start initialises the VPN with a TUN file descriptor and a base64-encoded
-// EdgeVPN token. The fd must come from Android's VpnService.Builder.establish().
-// This function returns immediately; the VPN runs in a background goroutine.
-func Start(fd int, token string) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if cancelFn != nil {
-		return fmt.Errorf("already running")
+// GenerateNodeKey returns a new Ed25519 private key in libp2p's marshaled
+// form, for Start. The node ID is derived from this key, and ledger entries
+// are signed with it, so the caller must store it and pass the same key on
+// every Start. A new key makes the phone a new node: its old ledger entries
+// stay locked to the old identity until the ownership TTL expires.
+func GenerateNodeKey() ([]byte, error) {
+	key, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
+	if err != nil {
+		return nil, fmt.Errorf("generate node key: %w", err)
 	}
-
-	tunFile = os.NewFile(uintptr(fd), "tun")
-	if tunFile == nil {
-		return fmt.Errorf("invalid file descriptor: %d", fd)
+	raw, err := crypto.MarshalPrivateKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("marshal node key: %w", err)
 	}
+	return raw, nil
+}
 
-	address := "10.1.0.2/24"
-
-	llger := &bufferLogger{}
-
-	cfg := config.Config{
+// networkConfig returns the edgevpn configuration for a token. The edgevpn
+// CLI fills most of these fields from its flag defaults (cmd/util.go), and the
+// library's zero values differ from those defaults in ways that break
+// interoperation with CLI nodes, so every value the CLI sets is set here too.
+func networkConfig(token string) config.Config {
+	return config.Config{
 		NetworkToken:   token,
-		Address:        address,
+		Address:        "10.1.0.2/24",
 		BootstrapIface: false,
 		LowProfile:     true,
 		Concurrency:    1,
@@ -99,30 +100,46 @@ func Start(fd int, token string) error {
 			SyncInterval:     10 * time.Second,
 		},
 	}
+}
 
-	// Generate the private key once and reuse it across Stop/Start cycles.
-	// Without this, every restart produces a new Node ID, breaking the ledger
-	// and preventing peers from recognising the phone as the same node.
-	if nodePrivKey == nil {
-		privKey, _, err := crypto.GenerateKeyPair(crypto.Ed25519, -1)
-		if err != nil {
-			return fmt.Errorf("generate private key: %w", err)
-		}
-		nodePrivKey, err = crypto.MarshalPrivateKey(privKey)
-		if err != nil {
-			return fmt.Errorf("marshal private key: %w", err)
-		}
+// Start initialises the VPN with a TUN file descriptor, a base64-encoded
+// EdgeVPN token and the node key from GenerateNodeKey. The fd must come from
+// Android's VpnService.Builder.establish(); Start takes ownership of it and
+// closes it on failure. This function returns immediately; the VPN runs in a
+// background goroutine.
+func Start(fd int, token string, nodeKey []byte) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if cancelFn != nil {
+		return fmt.Errorf("already running")
 	}
+
+	tunFile = os.NewFile(uintptr(fd), "tun")
+	if tunFile == nil {
+		return fmt.Errorf("invalid file descriptor: %d", fd)
+	}
+
+	// gomobile passes a Java byte[] as a slice over Java memory that is only
+	// valid until this call returns, and the node reads the key later, from
+	// the goroutine below. Without a copy it reads freed memory and fails
+	// with "proto: cannot parse invalid wire-format data".
+	nodeKey = append([]byte(nil), nodeKey...)
+	if _, err := crypto.UnmarshalPrivateKey(nodeKey); err != nil {
+		closeTunOnError("invalid node key")
+		return fmt.Errorf("invalid node key: %w", err)
+	}
+
+	llger := &bufferLogger{}
+	cfg := networkConfig(token)
 
 	SetMinLogLevel(cfg.LogLevel)
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
-		if closeErr := tunFile.Close(); closeErr != nil {
-			emit("WARN ", fmt.Sprintf("failed to close tun file on config error: %v", closeErr))
-		}
+		closeTunOnError("config error")
 		return fmt.Errorf("config error: %w", err)
 	}
-	nodeOpts = append(nodeOpts, node.WithPrivKey(nodePrivKey))
+	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
 
 	// Inject a protected TCP transport so every socket fd is passed through
 	// VpnService.protect() before connect/bind. This prevents the VPN's own
@@ -186,18 +203,14 @@ func Start(fd int, token string) error {
 
 	vpnNodeOpts, err := vpn.Register(vpnOpts...)
 	if err != nil {
-		if closeErr := tunFile.Close(); closeErr != nil {
-			emit("WARN ", fmt.Sprintf("failed to close tun file on vpn register error: %v", closeErr))
-		}
+		closeTunOnError("vpn register error")
 		return fmt.Errorf("vpn register error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, vpnNodeOpts...)
 
 	n, err := node.New(nodeOpts...)
 	if err != nil {
-		if closeErr := tunFile.Close(); closeErr != nil {
-			emit("WARN ", fmt.Sprintf("failed to close tun file on node create error: %v", closeErr))
-		}
+		closeTunOnError("node create error")
 		return fmt.Errorf("node create error: %w", err)
 	}
 
@@ -222,6 +235,16 @@ func Start(fd int, token string) error {
 
 	vpnState = "connected"
 	return nil
+}
+
+// closeTunOnError closes the TUN file when Start fails after taking it over,
+// and forgets it so a later Stop does not close the descriptor a second time.
+// The caller must hold mu.
+func closeTunOnError(reason string) {
+	if err := tunFile.Close(); err != nil {
+		emit("WARN ", fmt.Sprintf("failed to close tun file on %s: %v", reason, err))
+	}
+	tunFile = nil
 }
 
 // Stop shuts down the VPN and closes the TUN file descriptor.

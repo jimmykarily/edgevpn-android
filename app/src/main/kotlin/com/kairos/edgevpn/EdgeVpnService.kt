@@ -86,6 +86,16 @@ class EdgeVpnService : VpnService() {
             return
         }
 
+        // Loaded before the VPN interface exists, so a failure here has no
+        // TUN descriptor to leak.
+        val nodeKey = try {
+            NodeKeyStore.loadOrCreate(this)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load or create the node key", e)
+            stopSelf()
+            return
+        }
+
         startForeground(NOTIFICATION_ID, buildNotification())
 
         val pfd = Builder()
@@ -119,7 +129,7 @@ class EdgeVpnService : VpnService() {
         tunPfd = pfd
 
         try {
-            Edgevpn.start(fd.toLong(), token)
+            Edgevpn.start(fd.toLong(), token, nodeKey)
             isRunning = true
             Log.i(TAG, "VPN started")
         } catch (e: Exception) {

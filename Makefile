@@ -44,7 +44,7 @@ SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release install logs setup clean distclean
+.PHONY: all golib app preview release test install logs setup clean distclean
 
 all: app
 
@@ -135,6 +135,14 @@ release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	@echo "==> Building release APK..."
 	$(GRADLE) -p $(CURDIR) assembleRelease
 	@ls app/build/outputs/apk/release/*.apk
+
+# ── Tests ────────────────────────────────────────────────────────
+# The Go tests run on the build host. The app's unit tests run on the JVM
+# and need the AAR, because the app module links against it.
+test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	cd golib && go test ./...
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	$(GRADLE) -p $(CURDIR) testDebugUnitTest
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)

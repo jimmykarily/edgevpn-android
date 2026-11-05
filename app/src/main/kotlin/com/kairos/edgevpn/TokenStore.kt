@@ -10,7 +10,8 @@ object TokenStore {
     private const val FILE_NAME = "edgevpn_secure_prefs"
     private const val KEY_TOKEN = "vpn_token"
 
-    private fun prefs(context: Context): SharedPreferences {
+    // Also holds the node key, see NodeKeyStore.
+    internal fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         return EncryptedSharedPreferences.create(
             FILE_NAME,
