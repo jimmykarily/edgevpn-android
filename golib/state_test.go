@@ -93,6 +93,9 @@ func TestHandleNodeExitOfTheCurrentSession(t *testing.T) {
 	if got := rememberedFailure(); got != reasonStopped {
 		t.Errorf("remembered failure = %q, want %q", got, reasonStopped)
 	}
+	if got := rememberedDetail(); got != "node.Start returned error: boom" {
+		t.Errorf("error details = %q, want the raw error", got)
+	}
 	if !strings.Contains(RecentLogs(), "ERROR node.Start returned error: boom") {
 		t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
 	}
@@ -102,6 +105,12 @@ func rememberedFailure() string {
 	mu.Lock()
 	defer mu.Unlock()
 	return lastFailure
+}
+
+func rememberedDetail() string {
+	mu.Lock()
+	defer mu.Unlock()
+	return failureDetail
 }
 
 func TestHandleNodeExitOfAStaleSessionLeavesTheNewOneAlone(t *testing.T) {

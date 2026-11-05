@@ -1,6 +1,7 @@
 package edgevpn
 
 import (
+	"encoding/base64"
 	"os"
 	"strings"
 	"syscall"
@@ -101,6 +102,9 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 			if got := rememberedFailure(); got != reasonKey {
 				t.Errorf("remembered failure = %q, want %q", got, reasonKey)
 			}
+			if got := rememberedDetail(); got != "" {
+				t.Errorf("error details = %q for a key failure, want none", got)
+			}
 			if !strings.Contains(RecentLogs(), "ERROR invalid node key") {
 				t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
 			}
@@ -129,6 +133,49 @@ func TestStartWithAnUnusableDescriptorRemembersAPlainReason(t *testing.T) {
 	}
 	if got := rememberedFailure(); got != reasonStart {
 		t.Errorf("remembered failure = %q, want %q", got, reasonStart)
+	}
+	if got := rememberedDetail(); got != "invalid file descriptor: -1" {
+		t.Errorf("error details = %q, want the raw error", got)
+	}
+	Stop()
+	if got := rememberedDetail(); got != "" {
+		t.Errorf("error details = %q after Stop, want none", got)
+	}
+}
+
+// A token that edgevpn cannot read fails when the node is created, and the
+// error text can quote what the token holds (YAML quotes the start of a
+// value it cannot convert), so none of it may reach the error details.
+func TestStartWithABadTokenKeepsItOutOfTheErrorDetails(t *testing.T) {
+	t.Cleanup(func() { Stop(); ClearLogs() })
+	key, err := GenerateNodeKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	fd, err := syscall.Dup(int(r.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Close()
+	const secret = "secret-room-name"
+	token := base64.StdEncoding.EncodeToString([]byte("otp:\n  dht:\n    key: k\n    interval: " + secret))
+	if err := Start(fd, token, key, "10.1.0.2", "test"); err == nil {
+		Stop()
+		t.Fatal("Start accepted a token that is not valid YAML")
+	}
+	if !strings.Contains(RecentLogs(), "ERROR") {
+		t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
+	}
+	if got := rememberedDetail(); got != "" {
+		t.Errorf("error details = %q for a config failure, want none", got)
+	}
+	if strings.Contains(Snapshot(), "secret") || strings.Contains(Snapshot(), `"detail"`) {
+		t.Errorf("snapshot exposes the config error: %s", Snapshot())
 	}
 }
 

@@ -16,9 +16,13 @@ var (
 	currentNode *node.Node
 	startedAt   time.Time
 	lastFailure string
-	failedAt    time.Time
-	selfAddress string
-	selfName    string
+	// failureDetail is the raw error behind lastFailure, for the Problem
+	// help sheet. It stays empty for failures whose raw error can quote the
+	// network key.
+	failureDetail string
+	failedAt      time.Time
+	selfAddress   string
+	selfName      string
 	// hostReady is true once edgevpn has created the current session's
 	// libp2p host. Before that, Node.Host is written by the node goroutine
 	// without synchronization and must not be read.
@@ -70,6 +74,7 @@ func computeState(running bool, failure string, reachable int) string {
 // recordFailure remembers why the VPN could not run. The caller must hold mu.
 func recordFailure(reason string) {
 	lastFailure = reason
+	failureDetail = ""
 	failedAt = time.Now()
 }
 
@@ -89,9 +94,17 @@ const (
 	reasonStopped = "The VPN stopped unexpectedly."
 )
 
-// fail logs the raw error and remembers the plain reason for the app. The
-// caller must hold mu.
+// fail logs the raw error and remembers the plain reason for the app, and
+// the raw error as its details. The caller must hold mu.
 func fail(reason, raw string) {
+	failWithoutDetail(reason, raw)
+	failureDetail = raw
+}
+
+// failWithoutDetail is fail for errors that can quote the network key, such
+// as those of reading the key and creating the node from it: the raw error
+// goes to the log only. The caller must hold mu.
+func failWithoutDetail(reason, raw string) {
 	emit("ERROR", raw)
 	recordFailure(reason)
 }

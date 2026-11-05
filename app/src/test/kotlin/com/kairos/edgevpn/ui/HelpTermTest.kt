@@ -130,6 +130,24 @@ class HelpTermTest {
     }
 
     @Test
+    fun problemShowsTheErrorDetailsWhenThereAreAny() {
+        val failed = model.copy(
+            state = VpnState.PROBLEM,
+            error = "The VPN stopped unexpectedly.",
+            detail = "node.Start returned error: boom",
+            failedSecondsAgo = 5,
+        )
+        assertEquals(
+            listOf(
+                "Error" to "The VPN stopped unexpectedly.",
+                "Error details" to "node.Start returned error: boom",
+                "When" to "5 s ago",
+            ),
+            liveValues(HelpTerm.PROBLEM, failed, null),
+        )
+    }
+
+    @Test
     fun phoneFactsFeedUsingAndDetailedLogs() {
         val facts = PhoneFacts(using = "Wi-Fi", detailedLogs = true)
         assertEquals(listOf("Using" to "Wi-Fi"), liveValues(HelpTerm.USING, model, null, facts))

@@ -71,6 +71,7 @@ fun liveValues(
         HelpTerm.CONNECTED, HelpTerm.LOOKING -> add("Running for", model.runningSeconds?.let(::durationText))
         HelpTerm.PROBLEM -> {
             add("Error", model.error)
+            add("Error details", model.detail)
             add("When", model.failedSecondsAgo?.let(::agoText))
         }
         HelpTerm.THIS_PHONE -> {

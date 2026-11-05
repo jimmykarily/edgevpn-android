@@ -185,6 +185,20 @@ func TestSnapshotWhileStopped(t *testing.T) {
 	if got.State != "problem" || got.Error != "x" {
 		t.Fatalf("snapshot = %+v", got)
 	}
+	if strings.Contains(Snapshot(), `"detail"`) {
+		t.Fatalf("a failure without details must leave out detail: %s", Snapshot())
+	}
+}
+
+func TestSnapshotCarriesTheErrorDetails(t *testing.T) {
+	snap := buildSnapshot(snapshotInput{State: "problem", Failure: reasonStopped, Detail: "node.Start returned error: boom"})
+	out, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"detail":"node.Start returned error: boom"`) {
+		t.Fatalf("snapshot = %s", out)
+	}
 }
 
 func TestPeerIDFromKey(t *testing.T) {
