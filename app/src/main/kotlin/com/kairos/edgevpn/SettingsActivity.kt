@@ -336,7 +336,7 @@ class SettingsActivity : AppCompatActivity() {
         helpSheet?.dismiss()
         helpSheet = showHelp(this, term) {
             val model = try {
-                parseStatus(Edgevpn.snapshot(), System.currentTimeMillis() / 1000)
+                parseStatus(NetworkSource.snapshot(), System.currentTimeMillis() / 1000)
             } catch (e: Exception) {
                 Log.w(TAG, "Could not read the network snapshot", e)
                 return@showHelp emptyList()
