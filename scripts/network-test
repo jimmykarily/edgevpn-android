@@ -84,6 +84,27 @@ tap() {
     adb_ shell input tap $xy
 }
 
+# Swipes the screen up until $1 is on screen, at most 8 times, so a row below
+# the fold of a small screen is reached. Fails when it never shows.
+scroll_to() {
+    local i
+    for i in 1 2 3 4 5 6 7 8; do
+        on_screen "$1" && return 0
+        adb_ shell input swipe 160 500 160 200 300
+        sleep 1
+    done
+    on_screen "$1" || fail "no \"$1\" on screen after scrolling"
+}
+
+# Swipes the screen down to the top.
+scroll_top() {
+    local i
+    for i in 1 2 3 4 5 6; do
+        adb_ shell input swipe 160 200 160 500 200
+    done
+    sleep 1
+}
+
 # Waits up to $2 seconds for $1 on screen and prints how long it took.
 wait_for() {
     local text="$1" timeout="$2" start
@@ -183,11 +204,13 @@ finish() {
 # Screenshots of the peer's device sheet and of the Logs screen, then back
 # to the main screen.
 screens() {
+    scroll_to "$PEER_NAME"
     tap "$PEER_NAME"
     wait_for "$PEER_ADDRESS" 10 >/dev/null || fail "the device sheet for $PEER_NAME did not open"
     sleep 1
     shot device-sheet
     adb_ shell input keyevent KEYCODE_BACK
+    scroll_top
     wait_for "Turn off" 10 >/dev/null || fail "the main screen did not come back"
     tap "More options"
     wait_for "Logs" 10 >/dev/null || fail "the menu did not open"
