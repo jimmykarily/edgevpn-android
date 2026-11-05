@@ -2,6 +2,7 @@ package edgevpn
 
 import (
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -78,7 +79,7 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 		"invalid": []byte("not a key"),
 	} {
 		t.Run(name, func(t *testing.T) {
-			t.Cleanup(Stop)
+			t.Cleanup(func() { Stop(); ClearLogs() })
 			r, w, err := os.Pipe()
 			if err != nil {
 				t.Fatal(err)
@@ -97,6 +98,12 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 			if got := Status(); got != "problem" {
 				t.Errorf("Status() = %q after a failed Start, want problem", got)
 			}
+			if got := rememberedFailure(); got != reasonKey {
+				t.Errorf("remembered failure = %q, want %q", got, reasonKey)
+			}
+			if !strings.Contains(RecentLogs(), "ERROR invalid node key") {
+				t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
+			}
 			Stop()
 			if got := Status(); got != "off" {
 				t.Errorf("Status() = %q after Stop, want off", got)
@@ -107,6 +114,21 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 				t.Errorf("fstat on the TUN descriptor = %v, want EBADF (closed)", err)
 			}
 		})
+	}
+}
+
+func TestStartWithAnUnusableDescriptorRemembersAPlainReason(t *testing.T) {
+	t.Cleanup(func() { Stop(); ClearLogs() })
+	key, err := GenerateNodeKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Start(-1, "some-token", key, "10.1.0.2", "test"); err == nil {
+		Stop()
+		t.Fatal("Start succeeded with fd -1")
+	}
+	if got := rememberedFailure(); got != reasonStart {
+		t.Errorf("remembered failure = %q, want %q", got, reasonStart)
 	}
 }
 

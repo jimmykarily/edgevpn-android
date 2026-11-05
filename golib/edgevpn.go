@@ -141,7 +141,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 
 	tunFile = os.NewFile(uintptr(fd), "tun")
 	if tunFile == nil {
-		recordFailure("VPN interface could not be used")
+		fail(reasonStart, fmt.Sprintf("invalid file descriptor: %d", fd))
 		return fmt.Errorf("invalid file descriptor: %d", fd)
 	}
 
@@ -152,7 +152,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeKey = append([]byte(nil), nodeKey...)
 	if _, err := crypto.UnmarshalPrivateKey(nodeKey); err != nil {
 		closeTunOnError("invalid node key")
-		recordFailure(fmt.Sprintf("invalid node key: %v", err))
+		fail(reasonKey, fmt.Sprintf("invalid node key: %v", err))
 		return fmt.Errorf("invalid node key: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
 		closeTunOnError("config error")
-		recordFailure(fmt.Sprintf("config error: %v", err))
+		fail(reasonKey, fmt.Sprintf("config error: %v", err))
 		return fmt.Errorf("config error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
@@ -235,7 +235,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	vpnNodeOpts, err := vpn.Register(vpnOpts...)
 	if err != nil {
 		closeTunOnError("vpn register error")
-		recordFailure(fmt.Sprintf("vpn register error: %v", err))
+		fail(reasonStart, fmt.Sprintf("vpn register error: %v", err))
 		return fmt.Errorf("vpn register error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, vpnNodeOpts...)
@@ -243,7 +243,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	n, err := node.New(nodeOpts...)
 	if err != nil {
 		closeTunOnError("node create error")
-		recordFailure(fmt.Sprintf("node create error: %v", err))
+		fail(reasonStart, fmt.Sprintf("node create error: %v", err))
 		return fmt.Errorf("node create error: %w", err)
 	}
 
@@ -260,7 +260,6 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 			emit("INFO ", "node.Start returned cleanly (context cancelled)")
 			return
 		}
-		emit("ERROR", fmt.Sprintf("node.Start returned error: %v", err))
 		handleNodeExit(n, cancel, err)
 	}()
 
@@ -282,7 +281,7 @@ func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
 		currentNode = nil
 		cancelFn = nil
 		hostReady = false
-		recordFailure(err.Error())
+		fail(reasonStopped, fmt.Sprintf("node.Start returned error: %v", err))
 	}
 	mu.Unlock()
 	if current {
