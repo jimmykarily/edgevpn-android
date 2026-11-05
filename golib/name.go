@@ -2,6 +2,7 @@ package edgevpn
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -47,14 +48,21 @@ func markHostReady(n *node.Node) bool {
 }
 
 // hostReadyService is registered as a network service. edgevpn runs it after
-// the host exists; it marks the host ready and starts the name announcement.
+// the host exists, on the goroutine that ran n.Start; it marks the host ready
+// and starts the name announcement. When n's session was stopped before the
+// host was ready, Stop could not close the host, so the service closes it and
+// returns an error that keeps edgevpn from starting the services after it.
 // It returns at once.
 func hostReadyService(ctx context.Context, _ node.Config, n *node.Node, ledger *blockchain.Ledger) error {
-	if markHostReady(n) {
-		announceName(ctx, n, ledger)
+	if !markHostReady(n) {
+		closeNodeHost(n)
+		return errSessionStopped
 	}
+	announceName(ctx, n, ledger)
 	return nil
 }
+
+var errSessionStopped = errors.New("the VPN was turned off before the node started")
 
 // announceName keeps the phone's entry in the machines bucket named with the
 // chosen name until ctx is done. The host of n must be ready.

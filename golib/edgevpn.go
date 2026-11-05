@@ -267,11 +267,14 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 }
 
 // handleNodeExit deals with node n stopping on its own with err. It always
-// cancels n's context so the node's background work ends. Only when n is still
-// the current session does it release the tunnel, record the failure and tell
-// the listener; a stale exit must not disturb a newer session.
+// cancels n's context and closes n's host so the node's background work ends.
+// It runs on the goroutine that ran n.Start, so reading n's host is safe even
+// when the host was never marked ready. Only when n is still the current
+// session does it release the tunnel, record the failure and tell the
+// listener; a stale exit must not disturb a newer session.
 func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
 	cancel()
+	closeNodeHost(n)
 	mu.Lock()
 	current := currentNode == n
 	if current {
@@ -299,11 +302,16 @@ func closeTunOnError(reason string) {
 	tunFile = nil
 }
 
-// Stop shuts down the VPN and closes the TUN file descriptor.
-// Closing the fd tells Android the VPN interface is gone so it tears down routing.
+// Stop shuts down the VPN, closes the libp2p host and closes the TUN file
+// descriptor. Closing the fd tells Android the VPN interface is gone so it
+// tears down routing. The host is closed only when it was marked ready; a
+// session stopped earlier closes its own host in hostReadyService.
 func Stop() {
 	mu.Lock()
-	defer mu.Unlock()
+	var hostToClose *node.Node
+	if hostReady {
+		hostToClose = currentNode
+	}
 	if cancelFn != nil {
 		cancelFn()
 		cancelFn = nil
@@ -321,6 +329,8 @@ func Stop() {
 		}
 		tunFile = nil
 	}
+	mu.Unlock()
+	closeNodeHost(hostToClose)
 }
 
 // Status returns "off", "looking", "connected" or "problem".
