@@ -40,6 +40,8 @@ data class StatusModel(
     val helpers: Int,
     val lastHeardSecondsAgo: Long?,
     val lastHeardName: String?,
+    val selfName: String = "",
+    val failedSecondsAgo: Long? = null,
 )
 
 sealed interface Ago {
@@ -119,5 +121,7 @@ fun parseStatus(json: String, nowSeconds: Long): StatusModel {
         helpers = root.optInt("helpers", 0),
         lastHeardSecondsAgo = heard?.let { nowSeconds - it.optLong("at") },
         lastHeardName = heard?.let { nonEmpty(it.optString("name")) },
+        selfName = self?.optString("name") ?: "",
+        failedSecondsAgo = root.optLong("failedAt", 0).takeIf { it > 0 }?.let { maxOf(0L, nowSeconds - it) },
     )
 }

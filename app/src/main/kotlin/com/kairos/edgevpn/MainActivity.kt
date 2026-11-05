@@ -29,19 +29,24 @@ import com.google.android.material.button.MaterialButton
 import com.kairos.edgevpn.ui.Ago
 import com.kairos.edgevpn.ui.Badge
 import com.kairos.edgevpn.ui.DeviceRow
+import com.kairos.edgevpn.ui.HelpTerm
 import com.kairos.edgevpn.ui.How
 import com.kairos.edgevpn.ui.LegendLineDrawable
 import com.kairos.edgevpn.ui.MainButton
 import com.kairos.edgevpn.ui.NetFacts
 import com.kairos.edgevpn.ui.NetworkMapView
+import com.kairos.edgevpn.ui.PhoneFacts
 import com.kairos.edgevpn.ui.SecondTile
 import com.kairos.edgevpn.ui.StatusModel
 import com.kairos.edgevpn.ui.Using
 import com.kairos.edgevpn.ui.VpnState
+import com.kairos.edgevpn.ui.appendHelpIcon
 import com.kairos.edgevpn.ui.formatAgo
+import com.kairos.edgevpn.ui.liveValues
 import com.kairos.edgevpn.ui.parseStatus
 import com.kairos.edgevpn.ui.pickUsing
 import com.kairos.edgevpn.ui.planScreen
+import com.kairos.edgevpn.ui.showHelp
 import edgevpn.Edgevpn
 
 class MainActivity : AppCompatActivity() {
@@ -90,6 +95,12 @@ class MainActivity : AppCompatActivity() {
     /** The open device sheet, dismissed with the activity so its window does not leak. */
     private var deviceSheet: BottomSheetDialog? = null
 
+    /** The open help sheet, dismissed with the activity for the same reason. */
+    private var helpSheet: BottomSheetDialog? = null
+
+    /** The latest snapshot, which open help sheets read their live values from. */
+    private var lastModel: StatusModel? = null
+
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -121,6 +132,10 @@ class MainActivity : AppCompatActivity() {
         legendLine(R.id.legendDirect, Badge.DIRECT)
         legendLine(R.id.legendViaHelper, Badge.VIA_HELPER)
         legendLine(R.id.legendOffline, Badge.OFFLINE)
+        helpIcon(R.id.pillThisPhoneLabel, HelpTerm.THIS_PHONE)
+        helpIcon(R.id.pillUsingLabel, HelpTerm.USING)
+        helpIcon(R.id.sectionDevices, HelpTerm.YOUR_DEVICES)
+        helpIcon(R.id.sectionFinding, HelpTerm.FINDING)
         devicesSection = findViewById(R.id.devicesSection)
         deviceList = findViewById(R.id.deviceList)
         findingSection = findViewById(R.id.findingSection)
@@ -153,6 +168,8 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         deviceSheet?.dismiss()
         deviceSheet = null
+        helpSheet?.dismiss()
+        helpSheet = null
         super.onDestroy()
     }
 
@@ -215,6 +232,7 @@ class MainActivity : AppCompatActivity() {
             Log.w(TAG, "Could not read the network snapshot", e)
             return
         }
+        lastModel = model
         render(model)
     }
 
@@ -254,15 +272,18 @@ class MainActivity : AppCompatActivity() {
         findingSection.visibility = visibleIf(plan.showTiles)
         helpersValue.text = m.helpers.toString()
         helpersLabel.text = resources.getQuantityString(R.plurals.tile_helpers, m.helpers)
+        helpersLabel.appendHelpIcon(HelpTerm.HELPERS) { openHelp(it) }
         secondTile.visibility = visibleIf(plan.secondTile != SecondTile.NONE)
         when (plan.secondTile) {
             SecondTile.LAST_HEARD -> {
                 secondValue.text = agoText(m.lastHeardSecondsAgo ?: 0)
                 secondLabel.setText(R.string.tile_last_heard)
+                secondLabel.appendHelpIcon(HelpTerm.LAST_HEARD) { openHelp(it) }
             }
             SecondTile.FOUND_SO_FAR -> {
                 secondValue.text = m.total.toString()
                 secondLabel.text = resources.getQuantityString(R.plurals.tile_found, m.total)
+                secondLabel.appendHelpIcon(HelpTerm.YOUR_DEVICES) { openHelp(it) }
             }
             SecondTile.NONE -> Unit
         }
@@ -285,6 +306,14 @@ class MainActivity : AppCompatActivity() {
                 VpnState.PROBLEM -> R.string.state_problem_title
             }
         )
+        statusTitle.appendHelpIcon(
+            when (m.state) {
+                VpnState.OFF -> HelpTerm.OFF
+                VpnState.LOOKING -> HelpTerm.LOOKING
+                VpnState.CONNECTED -> HelpTerm.CONNECTED
+                VpnState.PROBLEM -> HelpTerm.PROBLEM
+            }
+        ) { openHelp(it) }
         statusText.text = when (m.state) {
             VpnState.OFF -> getString(R.string.state_off_text)
             VpnState.LOOKING -> m.runningSeconds?.let {
@@ -305,7 +334,9 @@ class MainActivity : AppCompatActivity() {
         devices.forEachIndexed { i, d ->
             if (i > 0) deviceList.addView(divider())
             val row = inflater.inflate(R.layout.item_device, deviceList, false)
-            bindBadge(row.findViewById(R.id.deviceIcon), row.findViewById(R.id.deviceBadge), d.badge)
+            val badge = row.findViewById<TextView>(R.id.deviceBadge)
+            bindBadge(row.findViewById(R.id.deviceIcon), badge, d.badge)
+            badge.appendHelpIcon(badgeTerm(d.badge)) { openHelp(it, d) }
             row.findViewById<TextView>(R.id.deviceName).text = deviceName(d)
             row.findViewById<TextView>(R.id.deviceLine).text =
                 getString(R.string.device_line, d.address, howText(d.how))
@@ -315,9 +346,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun legendLine(id: Int, badge: Badge) {
-        findViewById<TextView>(id).setCompoundDrawablesRelativeWithIntrinsicBounds(
+        val line = findViewById<TextView>(id)
+        line.setCompoundDrawablesRelativeWithIntrinsicBounds(
             LegendLineDrawable(badge, resources.displayMetrics.density), null, null, null,
         )
+        line.appendHelpIcon(badgeTerm(badge)) { openHelp(it) }
+    }
+
+    private fun helpIcon(id: Int, term: HelpTerm) {
+        findViewById<TextView>(id).appendHelpIcon(term) { openHelp(it) }
+    }
+
+    private fun badgeTerm(b: Badge) = when (b) {
+        Badge.DIRECT -> HelpTerm.DIRECT
+        Badge.VIA_HELPER -> HelpTerm.VIA_HELPER
+        Badge.OFFLINE -> HelpTerm.OFFLINE
+    }
+
+    /**
+     * Opens the help sheet for [term]. With a [device] the sheet is about that device and shows
+     * the live values of its connection, read from the newest snapshot by the device's ID.
+     */
+    private fun openHelp(term: HelpTerm, device: DeviceRow? = null) {
+        helpSheet?.dismiss()
+        helpSheet = showHelp(this, term, device?.let { deviceName(it) }) {
+            val m = lastModel ?: return@showHelp emptyList()
+            val current = device?.let { d -> m.devices.find { it.id == d.id } }
+            liveValues(term, m, current, PhoneFacts(usingText(), AppSettings.detailedLogs(this)))
+        }
     }
 
     private fun divider(): View = View(this).apply {
@@ -333,8 +389,11 @@ class MainActivity : AppCompatActivity() {
         bindBadge(view.findViewById(R.id.sheetIcon), view.findViewById(R.id.sheetBadge), d.badge)
         view.findViewById<TextView>(R.id.sheetName).text = deviceName(d)
         view.findViewById<TextView>(R.id.sheetAddress).text = d.address
-        view.findViewById<TextView>(R.id.sheetHow).text =
-            howText(d.how).replaceFirstChar { it.uppercase() }
+        val how = view.findViewById<TextView>(R.id.sheetHow)
+        how.text = howText(d.how).replaceFirstChar { it.uppercase() }
+        if (d.how == How.SameWifi || d.how == How.OverInternet) {
+            how.appendHelpIcon(HelpTerm.SAME_NETWORK) { openHelp(it, d) }
+        }
         view.findViewById<View>(R.id.sheetRemoteGroup).visibility = visibleIf(d.remote != null)
         view.findViewById<TextView>(R.id.sheetRemote).text = d.remote
         view.findViewById<View>(R.id.sheetTransportGroup).visibility = visibleIf(d.transport != null)

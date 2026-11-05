@@ -117,6 +117,14 @@ class StatusModelTest {
     }
 
     @Test
+    fun readsOwnNameAndFailureTime() {
+        val m = parseStatus(snapshot("").replace("\"failedAt\":0", "\"failedAt\":880"), 1000)
+        assertEquals("Phone", m.selfName)
+        assertEquals(120L, m.failedSecondsAgo)
+        assertNull(parseStatus(snapshot(""), 1000).failedSecondsAgo)
+    }
+
+    @Test
     fun negativeOpenSecondsClampToZero() {
         val m = parseStatus(snapshot(device("1", "a", "direct")), 500)
         assertEquals(0L, m.devices[0].openSeconds)

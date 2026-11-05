@@ -122,6 +122,7 @@
                             android:layout_marginEnd="10dp">
 
                             <TextView
+                                android:id="@+id/pillThisPhoneLabel"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:alpha="0.92"
@@ -142,6 +143,7 @@
                         <LinearLayout style="@style/Widget.EdgeVPN.Pill">
 
                             <TextView
+                                android:id="@+id/pillUsingLabel"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:alpha="0.92"
@@ -215,6 +217,7 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/sectionDevices"
                     style="@style/TextAppearance.EdgeVPN.Section"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -243,6 +246,7 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/sectionFinding"
                     style="@style/TextAppearance.EdgeVPN.Section"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
