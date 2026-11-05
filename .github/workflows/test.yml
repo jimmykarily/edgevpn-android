@@ -1,0 +1,62 @@
+name: Unit tests
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# A newer push to the same pull request or to main makes the running tests
+# pointless, so they are cancelled.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # make test (the scrub-key self-test, the Go tests and the app's JVM unit
+  # tests) and make lint (Android lint, failing on errors only). Neither
+  # needs a device, a network key or a secret, so this job finishes long
+  # before the emulator jobs and is the first to show a broken change.
+  test:
+    name: Unit tests and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The Makefile's own SDK in binaries/, as in the preview job: the
+      # runner's SDK lacks the NDK version the Makefile needs.
+      ANDROID_HOME: ${{ github.workspace }}/binaries/android-sdk
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: golib/go.mod
+          cache-dependency-path: golib/go.sum
+
+      # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
+      # downloads into binaries/, under the same key as the preview job, so
+      # the two share one cache entry.
+      - name: Cache the build tools
+        uses: actions/cache@v5
+        with:
+          path: binaries
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      - name: Run the unit tests
+        run: make test
+
+      - name: Run lint
+        run: make lint
+
+      - name: Upload the test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore

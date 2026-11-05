@@ -57,7 +57,7 @@ FORCE:
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test FORCE
+.PHONY: all golib app preview release test lint install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test FORCE
 
 all: app
 
@@ -158,6 +158,12 @@ test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	cd golib && go test ./...
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	$(GRADLE) -p $(CURDIR) testDebugUnitTest
+
+# Android lint on the debug build. It fails on errors and lists warnings in
+# app/build/reports/lint-results-debug.html.
+lint: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	$(GRADLE) -p $(CURDIR) lintDebug
 
 # ── Emulator ─────────────────────────────────────────────────────
 # A headless emulator (AVD "edgevpn", serial emulator-5556) driven by
