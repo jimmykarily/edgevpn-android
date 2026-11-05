@@ -62,10 +62,22 @@ A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the prev
 | `make emu-up` / `make emu-down` / `make emu-status` | Start headless and wait for boot, stop (saves a snapshot), report state |
 | `make emu-run` | Build the preview APK with the emulator architecture, install and launch it |
 | `make emu-shot` | Write `screenshot.png` |
+| `make e2e` | Run the screen tests on the emulator (see below) |
 
 `scripts/emulator` has more commands: `up-windowed`, `reset`, `install`, `launch`, `stop-app`, `shot [file]`, `ui` (view hierarchy as text; the text of editable fields is redacted to its length) and `logs`. The emulator reaches the internet through the host's NAT, never the host's local network.
 
 The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `android/arm64`, which is what phones and CI need). `make emu-run` sets it to `android/arm64,android/amd64`. Changing the value rebuilds the AAR, so building again with a different value takes a full gomobile bind.
+
+## Screen tests
+
+The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
+
+```bash
+make emu-up   # start the emulator, once
+make e2e      # build with android/amd64 added and run the tests on emulator-5556
+```
+
+`make e2e` runs `connectedDebugAndroidTest` on the device named by `ANDROID_SERIAL` (default `emulator-5556`) and turns off its animations first. It installs the debug build, `com.kairos.edgevpn`. Results are in `app/build/reports/androidTests/connected/`.
 
 ## Auto-downloaded tools
 

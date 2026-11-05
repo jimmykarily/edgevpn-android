@@ -57,7 +57,7 @@ FORCE:
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot FORCE
+.PHONY: all golib app preview release test install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build FORCE
 
 all: app
 
@@ -180,6 +180,40 @@ emu-run:
 
 emu-shot:
 	scripts/emulator shot
+
+# ── Screen tests on an emulator ─────────────────────────────────
+# The tests in app/src/androidTest drive the real screens with a chosen
+# network snapshot instead of a running node, so they need no network key.
+# They run against the debug build on the device named by ANDROID_SERIAL,
+# which is the emulator from emu-up unless set otherwise; CI sets it to the
+# emulator it starts. The Go library is built with android/amd64 added,
+# because the emulator is x86_64.
+ANDROID_SERIAL ?= emulator-5556
+E2E_TARGETS    := android/arm64,android/amd64
+
+# Builds the app and the test APK without a device, so CI can do the slow
+# part before it starts an emulator.
+e2e-build:
+	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
+
+e2e:
+	$(MAKE) e2e-run GOMOBILE_TARGETS=$(E2E_TARGETS)
+
+.PHONY: e2e-apks e2e-run
+e2e-apks: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	$(GRADLE) -p $(CURDIR) assembleDebug assembleDebugAndroidTest
+
+# Animations are turned off on the device first: the tests read the screen,
+# and a sheet halfway through sliding in is not where it will be. This is the
+# SDK's own adb, the one Gradle and scripts/emulator use, because a second adb
+# of another version restarts the adb server under them.
+e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	for s in window_animation_scale transition_animation_scale animator_duration_scale; do \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0; \
+	done
+	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)

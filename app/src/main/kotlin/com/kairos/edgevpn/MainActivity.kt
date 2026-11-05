@@ -48,7 +48,6 @@ import com.kairos.edgevpn.ui.parseStatus
 import com.kairos.edgevpn.ui.pickUsing
 import com.kairos.edgevpn.ui.planScreen
 import com.kairos.edgevpn.ui.showHelp
-import edgevpn.Edgevpn
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -246,7 +245,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refresh() {
         val model = try {
-            parseStatus(Edgevpn.snapshot(), System.currentTimeMillis() / 1000)
+            parseStatus(NetworkSource.snapshot(), System.currentTimeMillis() / 1000)
         } catch (e: Exception) {
             Log.w(TAG, "Could not read the network snapshot", e)
             return
