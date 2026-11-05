@@ -80,6 +80,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** A refresh shortly after Turn on or Turn off, so the card follows the tap. */
+    private val refreshSoon = Runnable { refresh() }
+
+    /** The open device sheet, dismissed with the activity so its window does not leak. */
+    private var deviceSheet: BottomSheetDialog? = null
+
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -130,7 +136,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         handler.removeCallbacks(poll)
+        handler.removeCallbacks(refreshSoon)
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        deviceSheet?.dismiss()
+        deviceSheet = null
+        super.onDestroy()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -175,14 +188,14 @@ class MainActivity : AppCompatActivity() {
         startForegroundService(
             Intent(this, EdgeVpnService::class.java).setAction(EdgeVpnService.ACTION_CONNECT)
         )
-        handler.postDelayed({ refresh() }, 300)
+        handler.postDelayed(refreshSoon, 300)
     }
 
     private fun disconnect() {
         startService(
             Intent(this, EdgeVpnService::class.java).setAction(EdgeVpnService.ACTION_DISCONNECT)
         )
-        handler.postDelayed({ refresh() }, 300)
+        handler.postDelayed(refreshSoon, 300)
     }
 
     private fun refresh() {
@@ -197,7 +210,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun render(m: StatusModel) {
         val plan = planScreen(m)
-        renderCard(m)
+        renderCard(m, plan.onlyDevice)
 
         currentButton = plan.button
         mainButton.setText(
@@ -242,7 +255,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderCard(m: StatusModel) {
+    private fun renderCard(m: StatusModel, onlyDevice: Boolean) {
         val (background, icon) = when (m.state) {
             VpnState.OFF -> R.drawable.bg_card_off to 0
             VpnState.LOOKING -> R.drawable.bg_card_looking to R.drawable.ic_sync
@@ -264,9 +277,11 @@ class MainActivity : AppCompatActivity() {
             VpnState.LOOKING -> m.runningSeconds?.let {
                 getString(R.string.state_looking_text_started, agoText(it))
             } ?: getString(R.string.state_looking_text)
-            VpnState.CONNECTED -> resources.getQuantityString(
-                R.plurals.state_connected_text, m.total, m.reachable, m.total
-            )
+            VpnState.CONNECTED -> if (onlyDevice) {
+                getString(R.string.state_connected_text_one)
+            } else {
+                resources.getQuantityString(R.plurals.state_connected_text, m.total, m.reachable, m.total)
+            }
             VpnState.PROBLEM -> m.error ?: getString(R.string.state_problem_text)
         }
     }
@@ -312,6 +327,8 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.sheet_copied, Toast.LENGTH_SHORT).show()
         }
         sheet.setContentView(view)
+        sheet.setOnDismissListener { if (deviceSheet === sheet) deviceSheet = null }
+        deviceSheet = sheet
         sheet.show()
     }
 

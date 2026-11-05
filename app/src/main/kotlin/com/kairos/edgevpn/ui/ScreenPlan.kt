@@ -15,6 +15,8 @@ data class ScreenPlan(
     val showTiles: Boolean,
     val secondTile: SecondTile,
     val showSeeLogs: Boolean,
+    /** Connected with exactly one device, which reads "You can reach your device." */
+    val onlyDevice: Boolean,
 )
 
 fun planScreen(m: StatusModel): ScreenPlan {
@@ -37,6 +39,7 @@ fun planScreen(m: StatusModel): ScreenPlan {
         showTiles = running,
         secondTile = secondTile,
         showSeeLogs = m.state == VpnState.PROBLEM,
+        onlyDevice = m.state == VpnState.CONNECTED && m.total == 1,
     )
 }
 

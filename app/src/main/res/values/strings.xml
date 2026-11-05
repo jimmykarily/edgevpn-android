@@ -28,7 +28,8 @@
         <item quantity="one">You can reach %1$d of your %2$d device.</item>
         <item quantity="other">You can reach %1$d of your %2$d devices.</item>
     </plurals>
-    <string name="state_problem_title">The VPN stopped</string>
+    <string name="state_connected_text_one">You can reach your device.</string>
+    <string name="state_problem_title">The VPN could not run</string>
     <string name="state_problem_text">Something went wrong while starting the VPN.</string>
     <string name="button_turn_on">Turn on</string>
     <string name="button_turn_off">Turn off</string>
