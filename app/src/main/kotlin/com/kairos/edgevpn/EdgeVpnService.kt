@@ -13,8 +13,6 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.system.OsConstants
 import android.util.Log
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import androidx.core.app.NotificationCompat
 import edgevpn.Edgevpn
 import edgevpn.SocketProtector
@@ -41,27 +39,13 @@ class EdgeVpnService : VpnService() {
     private var multicastLock: WifiManager.MulticastLock? = null
 
     /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
-     * Must run on the main thread or protect() can fail with "operation not permitted". */
+     * protect() is a binder call to the system, so it works from any thread. Calling it
+     * from the dialing thread keeps dials from waiting on the main thread. */
     private val socketProtector = object : SocketProtector {
         override fun protect(fd: Long): Boolean {
-            if (Looper.getMainLooper().isCurrentThread) {
-                val ok = this@EdgeVpnService.protect(fd.toInt())
-                if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
-                return ok
-            }
-            val latch = CountDownLatch(1)
-            val result = BooleanArray(1)
-            val mainHandler = Handler(Looper.getMainLooper())
-            mainHandler.postAtFrontOfQueue {
-                result[0] = this@EdgeVpnService.protect(fd.toInt())
-                if (!result[0]) Log.w(TAG, "VpnService.protect($fd) returned false")
-                latch.countDown()
-            }
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                Log.e(TAG, "VpnService.protect($fd) timed out (5s) waiting for main thread")
-                return false
-            }
-            return result[0]
+            val ok = this@EdgeVpnService.protect(fd.toInt())
+            if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
+            return ok
         }
     }
 
