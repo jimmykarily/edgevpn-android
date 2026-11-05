@@ -16,7 +16,7 @@ import (
 // with CLI nodes: with ownership off it writes unsigned ledger entries that
 // CLI nodes reject, and with zero intervals it never announces itself.
 func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
-	cfg := networkConfig("some-token")
+	cfg := networkConfig("some-token", "10.1.0.2")
 
 	if cfg.NetworkToken != "some-token" {
 		t.Errorf("NetworkToken = %q, want the token passed in", cfg.NetworkToken)
@@ -38,6 +38,9 @@ func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	}
 	if cfg.Ledger.AnnounceInterval != 10*time.Second || cfg.Ledger.SyncInterval != 10*time.Second {
 		t.Errorf("Ledger intervals = %v / %v, want 10s / 10s", cfg.Ledger.AnnounceInterval, cfg.Ledger.SyncInterval)
+	}
+	if cfg.Address != "10.1.0.2/24" {
+		t.Errorf("Address = %q, want 10.1.0.2/24", cfg.Address)
 	}
 	if !cfg.Discovery.DHT || !cfg.Discovery.MDNS {
 		t.Errorf("Discovery DHT = %v, MDNS = %v, want both true", cfg.Discovery.DHT, cfg.Discovery.MDNS)
@@ -75,6 +78,7 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 		"invalid": []byte("not a key"),
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Cleanup(Stop)
 			r, w, err := os.Pipe()
 			if err != nil {
 				t.Fatal(err)
@@ -86,12 +90,16 @@ func TestStartRejectsAMissingOrInvalidNodeKey(t *testing.T) {
 			}
 			r.Close()
 
-			if err := Start(fd, "some-token", key); err == nil {
+			if err := Start(fd, "some-token", key, "10.1.0.2", "test"); err == nil {
 				Stop()
 				t.Fatal("Start succeeded, want an error")
 			}
-			if got := Status(); got != "disconnected" {
-				t.Errorf("Status() = %q after a failed Start, want disconnected", got)
+			if got := Status(); got != "problem" {
+				t.Errorf("Status() = %q after a failed Start, want problem", got)
+			}
+			Stop()
+			if got := Status(); got != "off" {
+				t.Errorf("Status() = %q after Stop, want off", got)
 			}
 			var st syscall.Stat_t
 			if err := syscall.Fstat(fd, &st); err != syscall.EBADF {
