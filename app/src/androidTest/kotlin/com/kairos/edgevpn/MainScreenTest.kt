@@ -11,6 +11,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withParent
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
@@ -26,8 +27,12 @@ class MainScreenTest {
 
     private var snapshot = Snapshots.off()
 
+    private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    /** No stored key or setting from another test or an earlier install changes what the screen shows. */
     @Before
     fun showChosenSnapshot() {
+        AppSettings.startFresh(context)
         NetworkSource.snapshot = { snapshot }
     }
 
