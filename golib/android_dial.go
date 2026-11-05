@@ -61,8 +61,9 @@ func (d *androidProtectedDialer) DialContext(ctx context.Context, network, addre
 	}()
 
 	protected := protectSocket(uintptr(fd))
-	emit("INFO ", fmt.Sprintf("protect fd=%d %s %s: %v", fd, network, address, protected))
+	emit("DEBUG", fmt.Sprintf("protect fd=%d %s %s: %v", fd, network, address, protected))
 	if !protected {
+		emit("WARN ", fmt.Sprintf("could not protect socket for %s %s", network, address))
 		return nil, &protectError{network: network, address: address}
 	}
 

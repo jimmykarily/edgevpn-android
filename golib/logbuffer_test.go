@@ -64,3 +64,17 @@ func TestNetworkConfigLogLevelsFollowDetailedLogs(t *testing.T) {
 		t.Fatal(c.LogLevel, c.Libp2pLogLevel)
 	}
 }
+
+func TestLogDialErrorIsOnlyKeptWithDetailedLogs(t *testing.T) {
+	resetLogs(t)
+	LogDialError("tcp4 10.0.0.1:4001", fmt.Errorf("connection refused"))
+	if got := RecentLogs(); got != "" {
+		t.Fatalf("detailed logs off: logs = %q, want empty", got)
+	}
+
+	SetDetailedLogs(true)
+	LogDialError("tcp4 10.0.0.1:4001", fmt.Errorf("connection refused"))
+	if got := RecentLogs(); !strings.Contains(got, "dial error tcp4 10.0.0.1:4001: connection refused") {
+		t.Fatalf("detailed logs on: logs = %q, want the dial error", got)
+	}
+}
