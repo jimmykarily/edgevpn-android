@@ -30,8 +30,10 @@ import com.kairos.edgevpn.ui.Ago
 import com.kairos.edgevpn.ui.Badge
 import com.kairos.edgevpn.ui.DeviceRow
 import com.kairos.edgevpn.ui.How
+import com.kairos.edgevpn.ui.LegendLineDrawable
 import com.kairos.edgevpn.ui.MainButton
 import com.kairos.edgevpn.ui.NetFacts
+import com.kairos.edgevpn.ui.NetworkMapView
 import com.kairos.edgevpn.ui.SecondTile
 import com.kairos.edgevpn.ui.StatusModel
 import com.kairos.edgevpn.ui.Using
@@ -58,7 +60,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var addressPill: View
     private lateinit var addressValue: TextView
     private lateinit var usingValue: TextView
-    private lateinit var map: View
+    private lateinit var mapSection: View
+    private lateinit var map: NetworkMapView
+    private lateinit var mapLegend: View
     private lateinit var devicesSection: View
     private lateinit var deviceList: LinearLayout
     private lateinit var findingSection: View
@@ -110,7 +114,13 @@ class MainActivity : AppCompatActivity() {
         addressPill = findViewById(R.id.addressPill)
         addressValue = findViewById(R.id.addressValue)
         usingValue = findViewById(R.id.usingValue)
+        mapSection = findViewById(R.id.mapSection)
         map = findViewById(R.id.map)
+        mapLegend = findViewById(R.id.mapLegend)
+        map.onDeviceClick = { showDeviceSheet(it) }
+        legendLine(R.id.legendDirect, Badge.DIRECT)
+        legendLine(R.id.legendViaHelper, Badge.VIA_HELPER)
+        legendLine(R.id.legendOffline, Badge.OFFLINE)
         devicesSection = findViewById(R.id.devicesSection)
         deviceList = findViewById(R.id.deviceList)
         findingSection = findViewById(R.id.findingSection)
@@ -227,7 +237,10 @@ class MainActivity : AppCompatActivity() {
         addressValue.text = m.selfAddress
         if (plan.showPills) usingValue.text = usingText()
 
-        map.visibility = visibleIf(plan.showMap)
+        mapSection.visibility = visibleIf(plan.showMap)
+        mapLegend.visibility = visibleIf(plan.showMapLegend)
+        map.setLooking(plan.mapLooking)
+        map.setDevices(m.devices)
 
         devicesSection.visibility = visibleIf(plan.showDevices)
         if (plan.showDevices) {
@@ -299,6 +312,12 @@ class MainActivity : AppCompatActivity() {
             row.setOnClickListener { showDeviceSheet(d) }
             deviceList.addView(row)
         }
+    }
+
+    private fun legendLine(id: Int, badge: Badge) {
+        findViewById<TextView>(id).setCompoundDrawablesRelativeWithIntrinsicBounds(
+            LegendLineDrawable(badge, resources.displayMetrics.density), null, null, null,
+        )
     }
 
     private fun divider(): View = View(this).apply {

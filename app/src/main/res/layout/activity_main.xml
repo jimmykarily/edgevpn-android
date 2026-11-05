@@ -162,14 +162,51 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Placeholder for the network map. -->
-            <View
-                android:id="@+id/map"
+            <LinearLayout
+                android:id="@+id/mapSection"
                 android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_map"
-                android:contentDescription="@string/map_description" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <com.kairos.edgevpn.ui.NetworkMapView
+                    android:id="@+id/map"
+                    android:layout_width="match_parent"
+                    android:layout_height="240dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_map" />
+
+                <LinearLayout
+                    android:id="@+id/mapLegend"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/legendDirect"
+                        style="@style/TextAppearance.EdgeVPN.Legend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/legend_direct" />
+
+                    <TextView
+                        android:id="@+id/legendViaHelper"
+                        style="@style/TextAppearance.EdgeVPN.Legend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:text="@string/legend_via_helper" />
+
+                    <TextView
+                        android:id="@+id/legendOffline"
+                        style="@style/TextAppearance.EdgeVPN.Legend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:text="@string/legend_offline" />
+                </LinearLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/devicesSection"
