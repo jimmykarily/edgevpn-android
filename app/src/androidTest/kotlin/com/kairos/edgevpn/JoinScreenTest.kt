@@ -1,6 +1,10 @@
 package com.kairos.edgevpn
 
 import android.util.Base64
+import android.view.View
+import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.closeSoftKeyboard
@@ -18,6 +22,7 @@ import java.security.SecureRandom
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,6 +54,22 @@ class JoinScreenTest {
                 .check(matches(isDisplayed()))
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
             assertNull(TokenStore.load(context))
+        }
+    }
+
+    @Test
+    fun theKeyStaysOutOfRecentsAutofillAndKeyboardLearning() {
+        ActivityScenario.launch(JoinActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val flags = activity.window.attributes.flags
+                assertTrue("Recents must not show the key", flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+                val field = activity.findViewById<EditText>(R.id.keyField)
+                assertEquals(View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS, field.importantForAutofill)
+                assertTrue(
+                    "the keyboard must not learn the key",
+                    field.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING != 0,
+                )
+            }
         }
     }
 
