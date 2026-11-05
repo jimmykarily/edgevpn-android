@@ -2,15 +2,57 @@
 <resources>
     <string name="app_name">EdgeVPN</string>
 
-    <!-- Settings (token) -->
+    <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="token_hint">Paste EdgeVPN token</string>
-    <string name="save_token">Save token</string>
-    <string name="delete_token">Delete token</string>
-    <string name="token_saved">Token saved</string>
-    <string name="token_deleted">Token deleted</string>
-    <string name="token_empty_error">Token cannot be empty</string>
-    <string name="token_configured">Token is configured</string>
+    <string name="net_joined_title">You\'re part of a network</string>
+    <string name="net_joined_key">This phone joined with a network key.</string>
+    <string name="net_joined_private">Anyone with the same key can join too, so keep it private.</string>
+    <string name="net_none_title">No network yet</string>
+    <string name="net_none_key">To join, you need the network key.</string>
+    <string name="net_none_where">You get it from a device that is already in the network: it is the same token your computer uses to run EdgeVPN.</string>
+    <string name="net_replace_key">Replace key</string>
+    <string name="net_leave">Leave network</string>
+    <string name="net_join">Join network</string>
+    <string name="section_this_phone">This phone</string>
+    <string name="section_troubleshooting">Troubleshooting</string>
+    <string name="section_about">About</string>
+    <string name="setting_name">Name</string>
+    <string name="setting_name_sub">What your other devices see.</string>
+    <string name="setting_address">Address in your network</string>
+    <string name="setting_address_sub">Other devices reach this phone here.</string>
+    <string name="setting_view_logs">View logs</string>
+    <string name="setting_view_logs_sub">What the app has been doing, step by step.</string>
+    <string name="setting_detailed_logs">Detailed logs</string>
+    <string name="setting_detailed_logs_sub">Much more detail. Uses more battery, so turn it off when done.</string>
+    <string name="setting_phone_id">Phone ID</string>
+    <string name="setting_phone_id_sub">%1$s · tap to copy</string>
+    <string name="setting_phone_id_copy">Copy phone ID</string>
+    <string name="phone_id_copied">Phone ID copied</string>
+    <string name="setting_start_fresh">Start fresh</string>
+    <string name="setting_start_fresh_sub">Forget everything and become a new device.</string>
+    <string name="setting_version">Version</string>
+    <string name="setting_version_sub">%1$s · EdgeVPN %2$s</string>
+
+    <!-- Settings dialogs -->
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_save">Save</string>
+    <string name="leave_title">Leave network?</string>
+    <string name="leave_text">This phone will disconnect and forget the network key. You can join again later with the key.</string>
+    <string name="leave_confirm">Leave</string>
+    <string name="start_fresh_title">Start fresh?</string>
+    <string name="start_fresh_text">This phone will forget the network and become a new device. Your other devices may show the old phone as a separate, unreachable device for a few minutes. You\'ll need the network key to join again.</string>
+    <string name="start_fresh_confirm">Start fresh</string>
+    <string name="name_title">Name</string>
+    <string name="name_hint">Name of this phone</string>
+    <string name="name_empty_note">Leave it empty to use %1$s.</string>
+    <string name="address_title">Address in your network</string>
+    <string name="address_invalid">Use four numbers from 0 to 255, like 10.1.0.2.</string>
+    <string name="reconnect_text">Reconnect now to use the new address?</string>
+    <string name="reconnect_confirm">Reconnect</string>
+    <string name="reconnect_later">Later</string>
+    <string name="join_title">Join a network</string>
+    <string name="join_hint">Paste the key here…</string>
+    <string name="join_saved">Network key saved</string>
 
     <!-- Main screen: menu -->
     <string name="menu_settings">Settings</string>
