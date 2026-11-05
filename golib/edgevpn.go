@@ -317,9 +317,7 @@ func Stop() {
 
 // Status returns "off", "looking", "connected" or "problem".
 func Status() string {
-	mu.Lock()
-	defer mu.Unlock()
-	return computeState(cancelFn != nil, lastFailure, reachableCount())
+	return collectSnapshot().State
 }
 
 // androidAddrsFactory replaces unspecified listen addresses (0.0.0.0, ::)
