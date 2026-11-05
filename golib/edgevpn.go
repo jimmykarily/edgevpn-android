@@ -160,6 +160,8 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 		return fmt.Errorf("config error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
+	// The Alive options must come before the VPN service options: the VPN
+	// service blocks in its packet loop, so services after it never start.
 	nodeOpts = append(nodeOpts, services.Alive(aliveAnnounce, aliveScrub, aliveMax)...)
 
 	// Inject a protected TCP transport so every socket fd is passed through
@@ -250,20 +252,32 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 			return
 		}
 		emit("ERROR", fmt.Sprintf("node.Start returned error: %v", err))
-		mu.Lock()
-		if currentNode == n {
-			if tunFile != nil {
-				closeTunOnError("node failure")
-			}
-			currentNode = nil
-			cancelFn = nil
-			recordFailure(err.Error())
-		}
-		mu.Unlock()
-		notifyStopped(err.Error())
+		handleNodeExit(n, cancel, err)
 	}()
 
 	return nil
+}
+
+// handleNodeExit deals with node n stopping on its own with err. It always
+// cancels n's context so the node's background work ends. Only when n is still
+// the current session does it release the tunnel, record the failure and tell
+// the listener; a stale exit must not disturb a newer session.
+func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
+	cancel()
+	mu.Lock()
+	current := currentNode == n
+	if current {
+		if tunFile != nil {
+			closeTunOnError("node failure")
+		}
+		currentNode = nil
+		cancelFn = nil
+		recordFailure(err.Error())
+	}
+	mu.Unlock()
+	if current {
+		notifyStopped(err.Error())
+	}
 }
 
 // closeTunOnError closes the TUN file when Start fails after taking it over,
