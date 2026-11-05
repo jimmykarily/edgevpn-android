@@ -64,6 +64,7 @@
     <string name="logs_title">Logs</string>
     <string name="logs_copy_all">Copy all</string>
     <string name="logs_copied">Logs copied</string>
+    <string name="logs_nothing_to_copy">Nothing to copy yet.</string>
     <string name="logs_empty">Nothing has been logged yet.</string>
     <string name="logs_detailed_note">Network library details are in the developer log (logcat).</string>
 

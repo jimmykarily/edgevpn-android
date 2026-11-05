@@ -31,3 +31,26 @@ class LogsRulesTest {
         assertTrue(shouldStickToBottom(scrollY = 0, viewportHeight = 0, contentHeight = 0, slackPx = 8))
     }
 }
+
+class ShouldRefreshLogsTest {
+
+    @Test
+    fun refreshesWhenLogsChangedAndNothingIsSelected() {
+        assertTrue(shouldRefreshLogs(shown = "a", latest = "a\nb", hasSelection = false))
+    }
+
+    @Test
+    fun refreshesTheFirstTime() {
+        assertTrue(shouldRefreshLogs(shown = null, latest = "", hasSelection = false))
+    }
+
+    @Test
+    fun skipsWhenLogsAreUnchanged() {
+        assertFalse(shouldRefreshLogs(shown = "a", latest = "a", hasSelection = false))
+    }
+
+    @Test
+    fun skipsWhileTheUserHasASelection() {
+        assertFalse(shouldRefreshLogs(shown = "a", latest = "a\nb", hasSelection = true))
+    }
+}
