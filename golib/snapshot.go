@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mudler/edgevpn/pkg/node"
 	"github.com/mudler/edgevpn/pkg/protocol"
@@ -192,6 +193,7 @@ func collectSnapshot() snapshotInput {
 	mu.Lock()
 	n := currentNode
 	running := cancelFn != nil
+	ready := hostReady
 	in := snapshotInput{
 		StartedAt:   startedAt,
 		FailedAt:    failedAt,
@@ -203,7 +205,7 @@ func collectSnapshot() snapshotInput {
 	mu.Unlock()
 
 	if n != nil {
-		readNetwork(n, &in)
+		readNetwork(n, ready, &in)
 	}
 	reachable := 0
 	for _, d := range buildSnapshot(in).Devices {
@@ -216,9 +218,14 @@ func collectSnapshot() snapshotInput {
 }
 
 // readNetwork fills in the ledger, connection and interface facts of a
-// running node. Each read that fails leaves its part of in empty.
-func readNetwork(n *node.Node, in *snapshotInput) {
-	if h := n.Host(); h != nil {
+// running node. The host is read only when ready says edgevpn has
+// created it. Each read that fails leaves its part of in empty.
+func readNetwork(n *node.Node, ready bool, in *snapshotInput) {
+	var h host.Host
+	if ready {
+		h = n.Host()
+	}
+	if h != nil {
 		in.SelfID = h.ID().String()
 		for _, id := range h.Network().Peers() {
 			in.ConnectedPeers = append(in.ConnectedPeers, id.String())
@@ -243,7 +250,7 @@ func readNetwork(n *node.Node, in *snapshotInput) {
 			}
 		}
 	}
-	if h := n.Host(); h != nil {
+	if h != nil {
 		in.Conns = map[string][]connInfo{}
 		for _, m := range in.Machines {
 			id, err := peer.Decode(m.PeerID)

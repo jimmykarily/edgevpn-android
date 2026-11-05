@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mudler/edgevpn/pkg/protocol"
 	"github.com/mudler/edgevpn/pkg/types"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -203,5 +204,32 @@ func TestSnapshotKeepsSmallestAddressForARepeatedPeerID(t *testing.T) {
 		if len(snap.Devices) != 1 || snap.Devices[0].Address != "10.1.0.1" {
 			t.Fatalf("devices = %+v, want one at 10.1.0.1", snap.Devices)
 		}
+	}
+}
+
+func TestSnapshotSkipsTheHostUntilItIsReady(t *testing.T) {
+	resetSnapshotState(t)
+	n := newTestNode(t)
+	ledger, err := n.Ledger()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledger.Add(protocol.MachinesLedgerKey, map[string]interface{}{
+		"10.1.0.9": types.Machine{PeerID: "12D3KooWPeer", Hostname: "laptop", Address: "10.1.0.9"},
+	})
+	mu.Lock()
+	currentNode, cancelFn, hostReady = n, func() {}, false
+	mu.Unlock()
+
+	in := collectSnapshot()
+	if in.SelfID != "" || len(in.ConnectedPeers) != 0 || len(in.Conns) != 0 {
+		t.Errorf("network read despite host not ready: %+v", in)
+	}
+	var got snapshotJSON
+	if err := json.Unmarshal([]byte(Snapshot()), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Devices) != 1 || got.Devices[0].Reach != "offline" {
+		t.Errorf("devices = %+v, want the ledger device offline", got.Devices)
 	}
 }

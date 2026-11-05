@@ -125,3 +125,53 @@ func newTestNode(t *testing.T) *node.Node {
 	}
 	return n
 }
+
+func TestMarkHostReadyOnlyForTheCurrentSession(t *testing.T) {
+	t.Cleanup(Stop)
+	current := newTestNode(t)
+	mu.Lock()
+	currentNode = current
+	mu.Unlock()
+
+	if markHostReady(newTestNode(t)) {
+		t.Error("a stale session was marked ready")
+	}
+	mu.Lock()
+	ready := hostReady
+	mu.Unlock()
+	if ready {
+		t.Error("hostReady set by a stale session")
+	}
+
+	if !markHostReady(current) {
+		t.Fatal("the current session was not marked ready")
+	}
+	mu.Lock()
+	ready = hostReady
+	mu.Unlock()
+	if !ready {
+		t.Error("hostReady not set")
+	}
+
+	Stop()
+	mu.Lock()
+	ready = hostReady
+	mu.Unlock()
+	if ready {
+		t.Error("Stop left hostReady set")
+	}
+}
+
+func TestHandleNodeExitClearsHostReady(t *testing.T) {
+	t.Cleanup(Stop)
+	n := newTestNode(t)
+	mu.Lock()
+	currentNode, cancelFn, hostReady = n, func() {}, true
+	mu.Unlock()
+	handleNodeExit(n, func() {}, errors.New("boom"))
+	mu.Lock()
+	defer mu.Unlock()
+	if hostReady {
+		t.Error("hostReady survives the node exit")
+	}
+}
