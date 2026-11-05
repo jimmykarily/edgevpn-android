@@ -63,19 +63,27 @@ func isRelayed(c connInfo) bool {
 	return false
 }
 
-// sameNetwork reports whether remote is a private address (IPv4 private
-// ranges, or IPv6 unique local fc00::/7, which net.IP.IsPrivate covers) or an
-// IPv6 link-local address, and lies inside one of the phone's own networks.
-// Public addresses never count, even when they fall in a local prefix.
-func sameNetwork(remote net.IP, local []*net.IPNet) bool {
+// sameNetwork reports whether remote lies inside one of the phone's own
+// interface networks: private IPv4, IPv6 unique local or link-local, or a
+// global IPv6 prefix shared with the phone. Host-only prefixes (/32, /128)
+// say nothing about a shared link and never count, and neither does the
+// network that holds vpnAddress, the phone's own tunnel address.
+func sameNetwork(remote net.IP, local []*net.IPNet, vpnAddress net.IP) bool {
 	if remote == nil {
 		return false
 	}
-	if !remote.IsPrivate() && !remote.IsLinkLocalUnicast() {
-		return false
-	}
 	for _, n := range local {
-		if n != nil && n.Contains(remote) {
+		if n == nil {
+			continue
+		}
+		ones, bits := n.Mask.Size()
+		if ones == bits {
+			continue
+		}
+		if vpnAddress != nil && n.Contains(vpnAddress) {
+			continue
+		}
+		if n.Contains(remote) {
 			return true
 		}
 	}
