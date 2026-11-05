@@ -46,6 +46,7 @@ import com.kairos.edgevpn.ui.formatAgo
 import com.kairos.edgevpn.ui.liveValues
 import com.kairos.edgevpn.ui.parseStatus
 import com.kairos.edgevpn.ui.pickUsing
+import com.kairos.edgevpn.ui.showExpanded
 import com.kairos.edgevpn.ui.planScreen
 import com.kairos.edgevpn.ui.showHelp
 import java.util.Locale
@@ -427,7 +428,7 @@ class MainActivity : AppCompatActivity() {
         sheet.setContentView(view)
         sheet.setOnDismissListener { if (deviceSheet === sheet) deviceSheet = null }
         deviceSheet = sheet
-        sheet.show()
+        sheet.showExpanded()
     }
 
     private fun bindBadge(icon: ImageView, badge: TextView, b: Badge) {
