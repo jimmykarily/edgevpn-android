@@ -4,6 +4,7 @@ binaries/
 # Build outputs
 app/build/
 app/libs/*.aar
+app/libs/*-sources.jar
 build/
 .gradle/
 

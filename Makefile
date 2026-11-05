@@ -21,14 +21,21 @@ export ANDROID_HOME
 # ── Tool resolution (prefer PATH, fall back to binaries/) ───────
 GRADLE     := $(BINARIES)/gradle-$(GRADLE_VER)/bin/gradle
 SDKMANAGER := $(ANDROID_HOME)/cmdline-tools/latest/bin/sdkmanager
-GOPATH_BIN := $(shell go env GOPATH)/bin
 
 ADB      := $(or $(shell command -v adb 2>/dev/null),$(ANDROID_HOME)/platform-tools/adb)
-GOMOBILE := $(or $(shell command -v gomobile 2>/dev/null),$(GOPATH_BIN)/gomobile)
+
+# gomobile and gobind generate code against golang.org/x/mobile/bind, so they
+# must be the same version as the one golib/go.mod requires. They are
+# installed into a directory named for that version, which reinstalls them
+# whenever go.mod moves to another one.
+MOBILE_VER := $(shell cd golib && go list -m -f '{{.Version}}' golang.org/x/mobile)
+MOBILE_BIN := $(BINARIES)/gomobile-$(MOBILE_VER)
+GOMOBILE   := $(MOBILE_BIN)/gomobile
 
 # ── Outputs ──────────────────────────────────────────────────────
 GOLIB_AAR  := app/libs/edgevpn.aar
 APK        := app/build/outputs/apk/debug/app-debug.apk
+PREVIEW_APK := app/build/outputs/apk/preview/app-preview.apk
 GO_SOURCES  := $(wildcard golib/*.go) golib/go.mod golib/go.sum
 APP_SOURCES := $(shell find app/src -type f 2>/dev/null)
 SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
@@ -37,7 +44,7 @@ SDK_STAMP   := $(ANDROID_HOME)/platform-tools/adb
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app install setup clean distclean
+.PHONY: all golib app preview release install logs setup clean distclean
 
 all: app
 
@@ -83,10 +90,10 @@ $(GRADLE):
 	@rm -f /tmp/_gradle.zip
 
 # ── gomobile ─────────────────────────────────────────────────────
-$(GOPATH_BIN)/gomobile:
-	@echo "==> Installing gomobile and gobind..."
-	go install golang.org/x/mobile/cmd/gomobile@latest
-	go install golang.org/x/mobile/cmd/gobind@latest
+$(GOMOBILE):
+	@echo "==> Installing gomobile and gobind $(MOBILE_VER)..."
+	GOBIN=$(MOBILE_BIN) go install golang.org/x/mobile/cmd/gomobile@$(MOBILE_VER)
+	GOBIN=$(MOBILE_BIN) go install golang.org/x/mobile/cmd/gobind@$(MOBILE_VER)
 
 # ── Go library → AAR ────────────────────────────────────────────
 # -checklinkname=0: the anet library (transitive dep via libp2p) uses
@@ -97,7 +104,7 @@ $(GOLIB_AAR): $(GO_SOURCES) | $(GOMOBILE) $(SDK_STAMP)
 	@echo "==> Building Go library (gomobile bind)..."
 	@mkdir -p app/libs
 	cd golib && \
-	  PATH=$(JAVA_HOME)/bin:$$PATH \
+	  PATH=$(MOBILE_BIN):$(JAVA_HOME)/bin:$$PATH \
 	  ANDROID_NDK_HOME=$(ANDROID_HOME)/ndk/$(NDK_VER) \
 	  $(GOMOBILE) bind -target android/arm64 -androidapi $(MIN_SDK) \
 	    -ldflags="-checklinkname=0" \
@@ -113,6 +120,22 @@ $(APK): $(GOLIB_AAR) $(APP_SOURCES) build.gradle.kts app/build.gradle.kts settin
 
 app: $(APK)
 
+# The preview and release APKs are always rebuilt rather than tracked as file
+# targets, because what they contain depends on environment variables (the
+# signing key and EDGEVPN_VERSION, see app/build.gradle.kts) that make cannot
+# see change.
+preview: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	@echo "==> Building preview APK..."
+	$(GRADLE) -p $(CURDIR) assemblePreview
+	@echo "==> $(PREVIEW_APK)"
+
+release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
+	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
+	@echo "==> Building release APK..."
+	$(GRADLE) -p $(CURDIR) assembleRelease
+	@ls app/build/outputs/apk/release/*.apk
+
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)
 	@echo "==> Installing APK on connected device..."
@@ -124,7 +147,7 @@ logs:
 	$(ADB) logcat -v time --pid=$$($(ADB) shell pidof -s com.kairos.edgevpn)
 
 # ── Convenience ──────────────────────────────────────────────────
-setup: $(JAVA_HOME)/bin/java $(SDK_STAMP) $(GRADLE) $(GOPATH_BIN)/gomobile
+setup: $(JAVA_HOME)/bin/java $(SDK_STAMP) $(GRADLE) $(GOMOBILE)
 	@echo "==> All tools ready."
 
 clean:
