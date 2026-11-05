@@ -7,17 +7,30 @@ import (
 	"time"
 
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/mudler/edgevpn/pkg/blockchain"
+	"github.com/mudler/edgevpn/pkg/node"
 )
 
 // The edgevpn CLI fills in these values from its flag defaults (cmd/util.go).
 // The library's zero values differ, and a node built from them cannot work
-// with CLI nodes: with zero intervals it never announces itself, and without
-// relaying and hole punching it cannot reach peers behind NAT.
+// with CLI nodes: with ownership off it writes unsigned ledger entries that
+// CLI nodes reject, and with zero intervals it never announces itself.
 func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	cfg := networkConfig("some-token")
 
 	if cfg.NetworkToken != "some-token" {
 		t.Errorf("NetworkToken = %q, want the token passed in", cfg.NetworkToken)
+	}
+
+	mode, err := blockchain.ParseOwnershipMode(cfg.Ownership.Mode)
+	if err != nil {
+		t.Fatalf("Ownership.Mode %q does not parse: %v", cfg.Ownership.Mode, err)
+	}
+	if mode != blockchain.OwnershipEnforce {
+		t.Errorf("Ownership.Mode = %q, want enforce like the CLI default", cfg.Ownership.Mode)
+	}
+	if cfg.Ownership.TTL != node.DefaultOwnershipTTL {
+		t.Errorf("Ownership.TTL = %v, want %v", cfg.Ownership.TTL, node.DefaultOwnershipTTL)
 	}
 
 	if !cfg.Connection.AutoRelay || !cfg.Connection.HolePunch {

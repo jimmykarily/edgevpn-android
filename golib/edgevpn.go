@@ -99,6 +99,16 @@ func networkConfig(token string) config.Config {
 			AnnounceInterval: 10 * time.Second,
 			SyncInterval:     10 * time.Second,
 		},
+		// The CLI defaults to "enforce": ledger entries are signed with the
+		// node key and unsigned or foreign writes are rejected. The library's
+		// zero value means "off", and a node with ownership off writes
+		// unsigned entries that every CLI node drops, so the phone never
+		// appears in their machine list. All nodes in a network must run the
+		// same mode.
+		Ownership: config.Ownership{
+			Mode: "enforce",
+			TTL:  node.DefaultOwnershipTTL,
+		},
 	}
 }
 
