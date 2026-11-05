@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	"golang.org/x/sys/unix"
 )
 
 // androidProtectedDialer creates a TCP socket, calls VpnService.protect(fd) before
@@ -88,7 +89,9 @@ func (d *androidProtectedDialer) DialContext(ctx context.Context, network, addre
 	return conn, nil
 }
 
-// waitConnected polls fd for writability in 100ms chunks so that context
+// waitConnected uses pselect6 rather than select: Android's seccomp filter
+// kills the process on the plain select syscall on x86_64.
+// It polls fd for writability in 100ms chunks so that context
 // cancellation is respected promptly. Falls back to 5s if ctx has no deadline.
 func waitConnected(ctx context.Context, fd int, network, address string) error {
 	deadline := time.Now().Add(5 * time.Second)
@@ -110,13 +113,13 @@ func waitConnected(ctx context.Context, fd int, network, address string) error {
 		if remaining < wait {
 			wait = remaining
 		}
-		tv := syscall.NsecToTimeval(wait.Nanoseconds())
+		ts := unix.NsecToTimespec(wait.Nanoseconds())
 
-		var wfds, efds syscall.FdSet
+		var wfds, efds unix.FdSet
 		fdSetBit(&wfds, fd)
 		fdSetBit(&efds, fd)
 
-		n, err := syscall.Select(fd+1, nil, &wfds, &efds, &tv)
+		n, err := unix.Pselect(fd+1, nil, &wfds, &efds, &ts, nil)
 		if err == syscall.EINTR {
 			continue
 		}
@@ -139,6 +142,6 @@ func waitConnected(ctx context.Context, fd int, network, address string) error {
 	}
 }
 
-func fdSetBit(p *syscall.FdSet, fd int) {
-	p.Bits[fd/64] |= 1 << (uint(fd) % 64)
+func fdSetBit(p *unix.FdSet, fd int) {
+	p.Set(fd)
 }
