@@ -92,7 +92,7 @@ Real-network checks need a second device in the network. `scripts/testpeer` runs
 | `make peer-down` | Stop the VM and delete the run directory, including the key |
 | `make peer-status` | Whether the VM and edgevpn are running, and the VPN interface |
 
-`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `key` (the path of the key file, never its contents) and `addr` (the VM's libp2p address as the emulator reaches it).
+`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `serial` (its console log), `scrub` (stdin to stdout without the key), `key` (the path of the key file, never its contents) and `addr` (the VM's libp2p address as the emulator reaches it).
 
 The first `up` downloads the cloud image and builds edgevpn at the version `golib/go.mod` requires, both into `binaries/testpeer/`. Each run boots from a fresh overlay disk and generates its own key into `binaries/testpeer/run/token`; the owner's network key is never used. edgevpn in the VM runs with an ownership TTL of 60 seconds instead of the default 8 minutes, so it forgets a device that has been silent for about a minute. The host forwards `127.0.0.1:40022` to the VM's SSH and `127.0.0.1:40001` to its libp2p port (override with `TESTPEER_SSH_PORT` and `TESTPEER_P2P_PORT`).
 
@@ -107,7 +107,7 @@ make network-test   # build, start the peer if needed, run the check
 
 The script, `scripts/network-test`, stores the peer's temporary key, the address `10.1.0.4` and the peer's libp2p address in the app through an instrumented helper (`NetworkTestSetup`), grants the VPN permission with `appops`, and drives the main screen through `adb`. The app dials the peer directly at `10.0.2.2` (the host as the emulator sees it) instead of looking for it through the public DHT, so it connects in seconds. Because the peer forgets a device after 60 seconds without a heartbeat, the test also makes the app send one every 15 seconds instead of every 120. Neither setting has a screen in the app.
 
-It writes screenshots and the app's and the peer's logs into `build/network-test/`, and clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
+It writes screenshots, the app's log and the peer's edgevpn and console logs into `build/network-test/`. Every log it shows or writes goes through `scripts/scrub-key` first, which removes the key, the secrets inside it and any 12-character piece of either, and which prints nothing if it has no key to scrub with (`make test` runs its self-test). It clears the app's data at the end so the key does not stay on the device. A peer it started is stopped again. `NETWORK_TEST_LONG=0` skips the off/on part for a quick local run; CI always runs it.
 
 The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
 
