@@ -12,11 +12,11 @@ func TestValidateToken(t *testing.T) {
 	const cut = "This doesn't look like a complete key. It may have been cut off while copying."
 	const empty = "Paste a network key first."
 	cases := map[string]string{
-		valid:                                       "",
+		valid: "",
 		"  " + valid[:40] + "\n" + valid[40:] + "\n": "", // whitespace from a terminal
-		"":                                          empty,
-		valid[:len(valid)-22]:                       cut, // what adb input truncation produced
-		"not a key at all":                          cut,
+		"":                    empty,
+		valid[:len(valid)-22]: cut, // what adb input truncation produced
+		"not a key at all":    cut,
 	}
 	for in, want := range cases {
 		if got := ValidateToken(in); got != want {
