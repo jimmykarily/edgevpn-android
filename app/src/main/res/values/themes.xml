@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.EdgeVPN" parent="Theme.Material3.Light.NoActionBar">
+    <style name="Theme.EdgeVPN.Base" parent="Theme.Material3.Light.NoActionBar">
         <item name="colorPrimary">@color/teal</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorPrimaryContainer">#CCFBF1</item>
@@ -10,9 +10,10 @@
         <item name="android:statusBarColor">@color/screen_bg</item>
         <item name="android:navigationBarColor">@color/screen_bg</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.EdgeVPN.BottomSheetDialog</item>
     </style>
+
+    <style name="Theme.EdgeVPN" parent="Theme.EdgeVPN.Base" />
 
     <style name="ThemeOverlay.EdgeVPN.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/Widget.EdgeVPN.BottomSheet</item>

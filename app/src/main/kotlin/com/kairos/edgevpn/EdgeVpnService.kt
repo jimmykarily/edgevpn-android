@@ -100,8 +100,7 @@ class EdgeVpnService : VpnService() {
             }
             if (text != shownText) {
                 shownText = text
-                getSystemService(NotificationManager::class.java)
-                    .notify(NOTIFICATION_ID, buildNotification(text))
+                startForeground(NOTIFICATION_ID, buildNotification(text))
             }
             mainHandler.postDelayed(this, TICK_MS)
         }
