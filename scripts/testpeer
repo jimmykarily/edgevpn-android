@@ -243,8 +243,29 @@ cmd_ping() {
     vm ping -c 3 -W 2 "$1"
 }
 
+# Copies stdin to stdout with this run's key replaced by a placeholder, so
+# a log can be shown or uploaded even if the key ended up in it.
+cmd_scrub() {
+    python3 -I -c '
+import sys
+try:
+    secret = open(sys.argv[1]).read().strip()
+except OSError:
+    secret = ""
+for line in sys.stdin:
+    sys.stdout.write(line.replace(secret, "<redacted key>") if secret else line)
+' "$TOKEN_FILE"
+}
+
 cmd_logs() {
-    vm sudo cat /var/log/edgevpn.log
+    vm sudo cat /var/log/edgevpn.log | cmd_scrub
+}
+
+# The VM's console: kernel and cloud-init output, which shows why a VM did
+# not come up. It is kept until "down".
+cmd_serial() {
+    [ -f "$SERIAL_LOG" ] || die "no serial log. Run: scripts/testpeer up"
+    cmd_scrub <"$SERIAL_LOG"
 }
 
 cmd_key() {
@@ -279,6 +300,8 @@ usage: scripts/testpeer <command>
   status        whether the VM and edgevpn are up, and the VPN interface
   ping <addr>   ping an address from inside the VM
   logs          the VM's edgevpn log
+  serial        the VM's console log
+  scrub         copy stdin to stdout with this run's key replaced
   key           the path of the temporary key file (never its contents)
   machines      the devices in the VM's machine list, as "address peer-id"
   addr          the VM's libp2p address as seen from the Android emulator
@@ -291,6 +314,8 @@ case "${1:-}" in
     status) cmd_status ;;
     ping) cmd_ping "${2:-}" ;;
     logs) cmd_logs ;;
+    serial) cmd_serial ;;
+    scrub) cmd_scrub ;;
     key) cmd_key ;;
     machines) cmd_machines ;;
     addr) cmd_addr ;;

@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,7 +40,8 @@ class NetworkTestSetup {
             // test. An empty commit is queued behind those writes and returns once they are done.
             TokenStore.prefs(context).edit().commit()
 
-            assertEquals(token, TokenStore.load(context))
+            // Compared without the values, so a failure never prints the key.
+            assertTrue("the stored key differs from the test peer's", token == TokenStore.load(context))
             assertEquals(ADDRESS, AppSettings.address(context))
             assertEquals(peers, AppSettings.extraPeers(context))
             assertEquals(CHECK_IN_SECONDS, AppSettings.checkInSeconds(context))
