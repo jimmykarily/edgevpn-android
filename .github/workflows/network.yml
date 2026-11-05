@@ -1,0 +1,140 @@
+name: Network tests
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# A newer push to the same pull request or to main makes the running tests
+# pointless, so they are cancelled.
+concurrency:
+  group: network-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # make network-test: the debug app on an Android emulator joins the network
+  # of a QEMU VM running edgevpn (scripts/testpeer), pings it both ways, turns
+  # off for longer than the VM's 60 second ownership TTL and checks that
+  # traffic comes back after turning on again. The network key is a
+  # temporary one the VM generates for the run, so the job needs no secret.
+  network:
+    name: Network tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # One SDK and one adb for the build, the emulator runner and the test,
+      # as in the E2E tests job.
+      ANDROID_HOME: ${{ github.workspace }}/binaries/android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/binaries/android-sdk
+      JAVA_HOME: ${{ github.workspace }}/binaries/jdk-17
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: golib/go.mod
+          cache-dependency-path: golib/go.sum
+
+      - name: Install QEMU and xorriso
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+
+      # The same tools as the E2E tests job. The test peer's files are
+      # cached below under a key of their own.
+      - name: Cache the build tools
+        uses: actions/cache@v5
+        with:
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+            !binaries/testpeer
+          key: network-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      - name: Cache the emulator and system image
+        uses: actions/cache@v5
+        with:
+          path: |
+            binaries/android-sdk/emulator
+            binaries/android-sdk/system-images/android-35/default/x86_64
+          key: android-sdk-emulator-35-default-x86_64
+
+      - name: Cache the device and its snapshot
+        uses: actions/cache@v5
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: android-avd-35-default-x86_64
+
+      # The Debian cloud image and the edgevpn binary built for the VM. The
+      # script names both by version, and the key changes with the script
+      # (which pins the image) and with go.mod (which pins edgevpn).
+      - name: Cache the test peer's image and edgevpn
+        uses: actions/cache@v5
+        with:
+          path: |
+            binaries/testpeer/*.qcow2
+            binaries/testpeer/edgevpn-*
+          key: testpeer-${{ hashFiles('scripts/testpeer', 'golib/go.mod') }}
+
+      - name: Build the app and the tests
+        run: make e2e-build
+
+      # The emulator and the VM both need hardware acceleration, and the
+      # runner ships /dev/kvm owned by a group the job's user is not in.
+      - name: Let this job use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Started before the emulator, so a VM that cannot boot fails the job
+      # early and on its own.
+      - name: Start the test peer
+        run: make peer-up
+
+      - name: Create the device, only when it is not cached
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Device created and snapshotted for the cache."
+
+      # The runner's emulator is emulator-5554.
+      - name: Run the network test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: make network-test ANDROID_SERIAL=emulator-5554
+
+      # The app's log, the VM's edgevpn log and the screenshots. The test
+      # replaces the key with a placeholder if it shows up in either log.
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: network-test-logs
+          path: build/network-test/
+          if-no-files-found: ignore
+
+      - name: Stop the test peer
+        if: always()
+        run: make peer-down

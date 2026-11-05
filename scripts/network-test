@@ -1,0 +1,275 @@
+#!/usr/bin/env bash
+#
+# The real-network check: the debug app on an emulator joins the test
+# peer's network (scripts/testpeer), traffic flows both ways, and after the
+# VPN has been off for longer than the peer's 60 second ownership TTL it
+# flows again once the VPN is back on.
+#
+# make network-test builds the APKs and runs this. It expects the emulator
+# named by ANDROID_SERIAL to be booted. It starts the test peer when it is
+# not running and stops it again at the end; a peer that was already up is
+# left up. The peer's temporary key goes into the app through the app's own
+# storage and is never printed; the app's data is cleared at the end so the
+# key does not stay on the device.
+#
+# NETWORK_TEST_LONG=0 skips the off/on part for a quick local run.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+SERIAL="${ANDROID_SERIAL:-emulator-5556}"
+ADB="${EDGEVPN_ADB:-$ROOT/binaries/android-sdk/platform-tools/adb}"
+PACKAGE="com.kairos.edgevpn"
+APK="app/build/outputs/apk/debug/app-debug.apk"
+TEST_APK="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+RUNNER="$PACKAGE.test/androidx.test.runner.AndroidJUnitRunner"
+
+APP_ADDRESS="10.1.0.4"
+PEER_ADDRESS="10.1.0.10"
+# The VM's hostname, which is how the app names it.
+PEER_NAME="testpeer"
+
+CONNECT_TIMEOUT="${NETWORK_TEST_CONNECT_TIMEOUT:-300}"
+RECOVER_TIMEOUT="${NETWORK_TEST_RECOVER_TIMEOUT:-300}"
+# Longer than the peer's 60 second ownership TTL plus its 30 second scrub
+# interval, so the peer has dropped the app's entry when the VPN comes back.
+OFF_SECONDS="${NETWORK_TEST_OFF_SECONDS:-90}"
+LONG="${NETWORK_TEST_LONG:-1}"
+OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
+
+TESTPEER="$ROOT/scripts/testpeer"
+EMULATOR="$ROOT/scripts/emulator"
+STARTED_PEER=0
+T0=$(date +%s)
+
+log() { echo "[network-test +$(($(date +%s) - T0))s] $*"; }
+
+fail() {
+    log "FAIL: $*"
+    exit 1
+}
+
+adb_() { "$ADB" -s "$SERIAL" "$@"; }
+
+# The screen as text, with editable fields redacted (scripts/emulator ui).
+ui() { EDGEVPN_AVD_PORT="${SERIAL#emulator-}" EDGEVPN_ADB="$ADB" "$EMULATOR" ui; }
+
+# Prints "x y", the centre of the first view whose text or description is
+# exactly $1, or nothing when there is none on screen.
+find_view() {
+    ui | python3 -I -c '
+import re, sys
+want = sys.argv[1]
+# A label with a help sheet ends in a space and an icon character.
+def label(v):
+    return (v or "").replace("\ufffc", "").strip()
+for node in re.findall(r"<node [^>]*>", sys.stdin.read()):
+    attrs = dict(re.findall(r"([\w-]+)=\"([^\"]*)\"", node))
+    if want in (label(attrs.get("text")), label(attrs.get("content-desc"))):
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", attrs["bounds"]))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+' "$1"
+}
+
+on_screen() { [ -n "$(find_view "$1")" ]; }
+
+tap() {
+    local xy
+    xy=$(find_view "$1")
+    [ -n "$xy" ] || fail "no \"$1\" on screen"
+    # shellcheck disable=SC2086
+    adb_ shell input tap $xy
+}
+
+# Waits up to $2 seconds for $1 on screen and prints how long it took.
+wait_for() {
+    local text="$1" timeout="$2" start
+    start=$(date +%s)
+    until on_screen "$text"; do
+        [ $(($(date +%s) - start)) -lt "$timeout" ] || return 1
+        sleep 3
+    done
+    echo $(($(date +%s) - start))
+}
+
+shot() {
+    adb_ exec-out screencap -p >"$OUT/$1.png"
+    log "screenshot $OUT/$1.png"
+}
+
+# Pings $2 from the emulator (side "app") or from the VM (side "peer")
+# until one round of 3 pings gets answers, for up to $3 seconds.
+ping_until() {
+    local side="$1" addr="$2" timeout="$3" start out
+    start=$(date +%s)
+    while :; do
+        if [ "$side" = app ]; then
+            out=$(adb_ shell ping -c 3 -W 2 "$addr" 2>&1 || true)
+        else
+            out=$("$TESTPEER" ping "$addr" 2>&1 || true)
+        fi
+        if echo "$out" | grep -Eq ' [1-3] received'; then
+            log "ping from $side to $addr after $(($(date +%s) - start))s: $(echo "$out" | grep -E 'received|rtt')"
+            return 0
+        fi
+        [ $(($(date +%s) - start)) -lt "$timeout" ] || {
+            log "ping from $side to $addr: $out"
+            return 1
+        }
+        sleep 3
+    done
+}
+
+# The app's listening TCP sockets, over IPv4 and IPv6. libp2p listens once
+# on each, so a count above 2 means an old host from an earlier session is
+# still alive.
+listen_sockets() {
+    local uid
+    # Android 35 prints the app's uid as appId=, older releases as userId=.
+    uid=$(adb_ shell dumpsys package "$PACKAGE" | sed -n 's/.*\(appId\|userId\)=\([0-9]*\).*/\2/p' | head -1)
+    [ -n "$uid" ] || fail "could not find the app's uid"
+    adb_ shell cat /proc/net/tcp /proc/net/tcp6 | awk -v uid="$uid" '$4 == "0A" && $8 == uid' | wc -l
+}
+
+check_listen_sockets() {
+    local n
+    n=$(listen_sockets)
+    log "app LISTEN sockets: $n"
+    [ "$n" -eq 2 ] || fail "the app has $n listening sockets, want 2"
+}
+
+peer_has_app() { "$TESTPEER" machines | grep -q "^$APP_ADDRESS "; }
+
+# Copies the app's and the VM's logs into $OUT. The key is replaced if it
+# shows up in either, so the files are safe to upload.
+collect_logs() {
+    mkdir -p "$OUT"
+    adb_ logcat -d -v time >"$OUT/logcat.txt" 2>/dev/null || true
+    "$TESTPEER" logs >"$OUT/testpeer-edgevpn.log" 2>/dev/null || true
+    local key
+    key=$("$TESTPEER" key 2>/dev/null) || return 0
+    python3 -I - "$key" "$OUT/logcat.txt" "$OUT/testpeer-edgevpn.log" <<'PY'
+import sys
+secret = open(sys.argv[1]).read().strip()
+for path in sys.argv[2:]:
+    try:
+        text = open(path, errors="replace").read()
+    except OSError:
+        continue
+    if secret and secret in text:
+        open(path, "w").write(text.replace(secret, "<redacted key>"))
+PY
+}
+
+finish() {
+    local status=$?
+    trap - EXIT
+    set +e
+    collect_logs
+    adb_ shell am force-stop "$PACKAGE" >/dev/null 2>&1
+    # Removes the stored key and settings from the device.
+    adb_ shell pm clear "$PACKAGE" >/dev/null 2>&1
+    if [ "$STARTED_PEER" = 1 ]; then
+        "$TESTPEER" down
+    fi
+    if [ "$status" -eq 0 ]; then
+        log "PASS"
+    else
+        log "logs in $OUT"
+    fi
+    exit "$status"
+}
+
+# Screenshots of the peer's device sheet and of the Logs screen, then back
+# to the main screen.
+screens() {
+    tap "$PEER_NAME"
+    wait_for "$PEER_ADDRESS" 10 >/dev/null || fail "the device sheet for $PEER_NAME did not open"
+    sleep 1
+    shot device-sheet
+    adb_ shell input keyevent KEYCODE_BACK
+    wait_for "Turn off" 10 >/dev/null || fail "the main screen did not come back"
+    tap "More options"
+    wait_for "Logs" 10 >/dev/null || fail "the menu did not open"
+    tap "Logs"
+    sleep 2
+    shot logs
+    adb_ shell input keyevent KEYCODE_BACK
+    wait_for "Turn off" 10 >/dev/null || fail "the main screen did not come back"
+}
+
+main() {
+    rm -rf "$OUT"
+    mkdir -p "$OUT"
+    [ -f "$APK" ] && [ -f "$TEST_APK" ] || fail "no APKs. Run: make network-test"
+    [ "$(adb_ shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] || fail "$SERIAL is not booted"
+
+    trap finish EXIT
+    if ! "$TESTPEER" status >/dev/null 2>&1; then
+        STARTED_PEER=1
+        "$TESTPEER" up
+    fi
+    local peer
+    peer=$("$TESTPEER" addr)
+    log "peer at $peer"
+
+    adb_ install -r "$APK" >/dev/null
+    adb_ install -r "$TEST_APK" >/dev/null
+    adb_ shell am force-stop "$PACKAGE"
+    adb_ shell pm clear "$PACKAGE" >/dev/null
+    adb_ logcat -c
+
+    # The files go straight from the key file into the app's private
+    # storage, so the key never appears on a command line.
+    adb_ shell run-as "$PACKAGE" mkdir -p files/network-test
+    adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/token' <"$("$TESTPEER" key)"
+    echo "$peer" | adb_ exec-in run-as "$PACKAGE" sh -c 'cat > files/network-test/peers'
+    local result
+    result=$(adb_ shell am instrument -w -e class com.kairos.edgevpn.NetworkTestSetup "$RUNNER")
+    echo "$result" | grep -q "^OK (1 test)" || fail "storing the test network: $result"
+    log "test network stored in the app"
+
+    # Android asks once whether the app may run a VPN. The answer is set
+    # here instead, as the dialog would.
+    adb_ shell appops set "$PACKAGE" ACTIVATE_VPN allow
+
+    adb_ shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null
+    wait_for "Turn on" 30 >/dev/null || fail "the main screen did not show Turn on"
+    tap "Turn on"
+    log "turned on"
+    local took
+    took=$(wait_for "Connected" "$CONNECT_TIMEOUT") || { shot not-connected; fail "not connected after ${CONNECT_TIMEOUT}s"; }
+    log "connected after ${took}s"
+    shot connected
+
+    ping_until app "$PEER_ADDRESS" 60 || fail "the app cannot ping the peer"
+    ping_until peer "$APP_ADDRESS" 60 || fail "the peer cannot ping the app"
+    check_listen_sockets
+    screens
+
+    if [ "$LONG" != 0 ]; then
+        tap "Turn off"
+        wait_for "VPN is off" 30 >/dev/null || fail "the VPN did not turn off"
+        log "turned off, waiting ${OFF_SECONDS}s"
+        sleep "$OFF_SECONDS"
+        if peer_has_app; then
+            fail "the peer still lists $APP_ADDRESS after ${OFF_SECONDS}s off"
+        fi
+        log "the peer has dropped $APP_ADDRESS from its machine list"
+        tap "Turn on"
+        log "turned on again"
+        took=$(wait_for "Connected" "$RECOVER_TIMEOUT") || { shot not-reconnected; fail "not connected again after ${RECOVER_TIMEOUT}s"; }
+        log "connected again after ${took}s"
+        ping_until app "$PEER_ADDRESS" "$RECOVER_TIMEOUT" || fail "the app cannot ping the peer after off and on"
+        ping_until peer "$APP_ADDRESS" "$RECOVER_TIMEOUT" || fail "the peer cannot ping the app after off and on"
+        check_listen_sockets
+    fi
+
+    shot connected-final
+    "$TESTPEER" machines | sed 's/^/[peer machines] /'
+}
+
+main "$@"
