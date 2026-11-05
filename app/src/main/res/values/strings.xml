@@ -26,7 +26,6 @@
     <string name="setting_detailed_logs_sub">Much more detail. Uses more battery, so turn it off when done.</string>
     <string name="setting_phone_id">Phone ID</string>
     <string name="setting_phone_id_sub">%1$s · tap to copy</string>
-    <string name="setting_phone_id_copy">Copy phone ID</string>
     <string name="phone_id_copied">Phone ID copied</string>
     <string name="setting_start_fresh">Start fresh</string>
     <string name="setting_start_fresh_sub">Forget everything and become a new device.</string>
