@@ -11,10 +11,11 @@ import (
 
 // LogDialError logs a dial failure to the app log (and thus logcat) so we can
 // see the underlying error (e.g. connection refused, permission denied).
-// Uses WARN level so it is not dropped when min log level is "warn".
+// Each dial is logged at DEBUG: a node dials hundreds of peers while it
+// bootstraps, and these lines would push the startup lines out of the buffer.
 func LogDialError(addr string, err error) {
 	if err != nil {
-		emit("WARN ", fmt.Sprintf("dial error %s: %v", addr, err))
+		emit("DEBUG", fmt.Sprintf("dial error %s: %v", addr, err))
 	}
 }
 
