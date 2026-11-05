@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.kairos.edgevpn.R
 import kotlin.math.abs
@@ -310,8 +311,18 @@ fun showHelp(
         owner?.lifecycle?.removeObserver(observer)
     }
     sheet.setContentView(view)
-    sheet.show()
+    sheet.showExpanded()
     return sheet
+}
+
+/**
+ * Shows the sheet fully open instead of at its collapsed height, so on a small screen the lower
+ * rows are not cut off. A sheet taller than the screen scrolls inside its content view.
+ */
+fun BottomSheetDialog.showExpanded() {
+    behavior.skipCollapsed = true
+    behavior.state = BottomSheetBehavior.STATE_EXPANDED
+    show()
 }
 
 /** "Label: value" lines, with the value in bold, and in a fixed-width font when it is an address or an ID. */
