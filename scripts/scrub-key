@@ -16,6 +16,7 @@ shows text it could not scrub.
 
 import base64
 import binascii
+import io
 import sys
 
 WINDOW = 12
@@ -61,6 +62,16 @@ def scrub_line(line, windows):
     return "".join(out)
 
 
+def scrub_stream(raw_in, text_out, windows):
+    """Copies the bytes of raw_in to text_out, line by line, scrubbed. Bytes
+    that are not UTF-8 become U+FFFD, so a stray byte in a log cannot stop
+    the copy halfway."""
+    for raw in raw_in:
+        line = raw.decode("utf-8", "replace")
+        end = "\n" if line.endswith("\n") else ""
+        text_out.write(scrub_line(line[:len(line) - len(end)], windows) + end)
+
+
 def self_test():
     otp_dht = "Q7mZp2LxV9cKw4RtYb8NfHs3JdUe6GaTo1Ci5Bv0"
     otp_crypto = "h2KdP9sLq4WmX7zR1cVb8NtYf3GjE6uAo5Ti0Ub"
@@ -104,6 +115,18 @@ def self_test():
         print(f"FAIL unrelated text changed: {scrub_line(unrelated, windows)!r}")
     else:
         print("ok   unrelated text unchanged")
+    raw = b"bad \xff\xfe byte " + token.encode() + b"\nnext line\n"
+    out = io.StringIO()
+    try:
+        scrub_stream(io.BytesIO(raw), out, windows)
+        got = out.getvalue()
+    except Exception as e:  # noqa: BLE001 - the case is that nothing raises
+        got = f"raised {e!r}"
+    if token in got or PLACEHOLDER not in got or not got.endswith("next line\n"):
+        failed += 1
+        print(f"FAIL input that is not UTF-8: {got!r}")
+    else:
+        print("ok   input that is not UTF-8")
     if secrets_of("") != [""] or windows_of(secrets_of("")):
         failed += 1
         print("FAIL an empty token yields windows")
@@ -127,9 +150,7 @@ def main(argv):
     if not windows:
         print("scrub-key: no key to scrub with, refusing to copy the text", file=sys.stderr)
         return 2
-    for line in sys.stdin:
-        end = "\n" if line.endswith("\n") else ""
-        sys.stdout.write(scrub_line(line[:len(line) - len(end)], windows) + end)
+    scrub_stream(sys.stdin.buffer, sys.stdout, windows)
     return 0
 
 
