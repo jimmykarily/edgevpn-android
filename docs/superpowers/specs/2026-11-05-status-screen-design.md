@@ -89,7 +89,9 @@ The buffer and the Logs screen hold edgevpn's own messages (the ones that go thr
 
 ### Help: the (?) icons
 
-Every plain-language term gets a small, faded (?) icon next to it, the first time the term appears on a screen: the status title, the "This phone" and "Using" pills, section titles, each badge, each tile, the map legend, and each settings item. Tapping it opens a bottom sheet with:
+Every plain-language term gets a small, faded (?) icon next to it, the first time the term appears on a screen: the status title, the "This phone" and "Using" pills, section titles, each badge, each tile, the map legend, and each settings item. Placement rule: the icon sits directly after the last word of its term, vertically centred on that line of text, and scales with the text size (about the height of a capital letter, never under 13 dp of visible circle; the touch target is at least 48 dp, extended around the icon). When a label wraps, the icon stays attached to its last word and never wraps onto a line of its own or drifts to the edge of its container. In Android, put the icon inline in the text (an image span or a compound drawable), not as a separate view aligned to the container. The mockup shows the intended result.
+
+Tapping it opens a bottom sheet with:
 
 1. the term, and the device name when the sheet is about one device;
 2. the plain explanation;
