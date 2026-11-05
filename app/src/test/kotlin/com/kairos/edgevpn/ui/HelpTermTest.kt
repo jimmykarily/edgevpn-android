@@ -1,7 +1,6 @@
 package com.kairos.edgevpn.ui
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -149,10 +148,39 @@ class HelpTermTest {
     }
 
     @Test
-    fun deviceTermsTalkAboutTheConnection() {
-        assertTrue(HelpTerm.VIA_HELPER.aboutConnection)
-        assertTrue(HelpTerm.SAME_NETWORK.aboutConnection)
-        assertFalse(HelpTerm.CONNECTED.aboutConnection)
-        assertFalse(HelpTerm.PHONE_ID.aboutConnection)
+    fun everyTermHasALiveScope() {
+        val expected = mapOf(
+            HelpTerm.CONNECTED to LiveScope.PHONE,
+            HelpTerm.LOOKING to LiveScope.PHONE,
+            HelpTerm.OFF to LiveScope.PHONE,
+            HelpTerm.PROBLEM to LiveScope.PHONE,
+            HelpTerm.THIS_PHONE to LiveScope.PHONE,
+            HelpTerm.USING to LiveScope.PHONE,
+            HelpTerm.YOUR_DEVICES to LiveScope.NETWORK,
+            HelpTerm.DIRECT to LiveScope.CONNECTION,
+            HelpTerm.VIA_HELPER to LiveScope.CONNECTION,
+            HelpTerm.OFFLINE to LiveScope.CONNECTION,
+            HelpTerm.SAME_NETWORK to LiveScope.CONNECTION,
+            HelpTerm.FINDING to LiveScope.PHONE,
+            HelpTerm.HELPERS to LiveScope.PHONE,
+            HelpTerm.LAST_HEARD to LiveScope.NETWORK,
+            HelpTerm.NETWORK_KEY to LiveScope.PHONE,
+            HelpTerm.NAME to LiveScope.PHONE,
+            HelpTerm.ADDRESS to LiveScope.PHONE,
+            HelpTerm.DETAILED_LOGS to LiveScope.PHONE,
+            HelpTerm.PHONE_ID to LiveScope.PHONE,
+            HelpTerm.START_FRESH to LiveScope.PHONE,
+        )
+        assertEquals(HelpTerm.values().toSet(), expected.keys)
+        for (t in HelpTerm.values()) assertEquals(t.name, expected[t], t.liveScope)
+    }
+
+    @Test
+    fun badgeTermsFollowTheDevicesCurrentBadge() {
+        assertEquals(HelpTerm.VIA_HELPER, HelpTerm.DIRECT.followBadge(laptopRow))
+        assertEquals(HelpTerm.OFFLINE, HelpTerm.VIA_HELPER.followBadge(serverRow))
+        assertEquals(HelpTerm.DIRECT, HelpTerm.DIRECT.followBadge(null))
+        assertEquals(HelpTerm.SAME_NETWORK, HelpTerm.SAME_NETWORK.followBadge(laptopRow))
+        assertEquals(HelpTerm.DIRECT, Badge.DIRECT.helpTerm)
     }
 }

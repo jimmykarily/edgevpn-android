@@ -25,6 +25,9 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.kairos.edgevpn.R
 import kotlin.math.abs
@@ -190,16 +193,11 @@ private fun TextView.textWithoutHelpIcon(): CharSequence {
  * Adds a faded (?) icon after the last word of this TextView's text. The icon is about as tall as
  * a capital letter (never under 13 dp), sits on the middle of its line, and is held to the last
  * word by a non-breaking space so it never wraps onto a line of its own. Tapping within 48 dp of
- * it calls [onClick]. Call it again after every change of the text.
+ * it calls [onClick]. Call it again after every change of the text. An all-caps transformation
+ * would drop the icon, so uppercase such text before calling this instead.
  */
 fun TextView.appendHelpIcon(term: HelpTerm, onClick: (HelpTerm) -> Unit) {
-    var base = textWithoutHelpIcon()
-    // An all-caps transformation would drop the spans, so apply it to the text once instead.
-    val caps = transformationMethod
-    if (caps?.javaClass?.simpleName == "AllCapsTransformationMethod") {
-        base = caps.getTransformation(base, this).toString()
-        isAllCaps = false
-    }
+    val base = textWithoutHelpIcon()
 
     val bounds = Rect()
     paint.getTextBounds("H", 0, 1, bounds)
@@ -228,6 +226,8 @@ fun TextView.appendHelpIcon(term: HelpTerm, onClick: (HelpTerm) -> Unit) {
         isFocusable = focusable
     }
     setText(sb, TextView.BufferType.SPANNABLE)
+    // The icon itself has no words, so TalkBack hears the text followed by "Help: <term>".
+    contentDescription = "$base, " + context.getString(R.string.help_icon_description, context.getString(texts(term).title))
 
     val p = parent as? ViewGroup ?: return
     val delegate = p.touchDelegate as? HelpTouchDelegate ?: HelpTouchDelegate(p).also { p.touchDelegate = it }
@@ -236,35 +236,51 @@ fun TextView.appendHelpIcon(term: HelpTerm, onClick: (HelpTerm) -> Unit) {
 
 /**
  * Opens the help sheet for [term]: its title, the device name when the sheet is about one
- * device, the plain explanation, the technical details, and the values from [live], refreshed
- * every 2 seconds until the sheet is dismissed. Returns the sheet so the caller can dismiss it.
+ * device, the plain explanation, the technical details, and the values from [live]. Every
+ * 2 seconds while the sheet is open and the activity is started, it asks [termNow] for the term
+ * (a badge sheet follows its device's current badge) and [live] for the values, and redraws what
+ * changed. Returns the sheet so the caller can dismiss it.
  */
 fun showHelp(
     activity: Activity,
     term: HelpTerm,
     deviceName: String? = null,
+    termNow: () -> HelpTerm = { term },
     live: () -> List<Pair<String, String>>,
 ): BottomSheetDialog {
-    val t = texts(term)
     val sheet = BottomSheetDialog(activity)
     val view = activity.layoutInflater.inflate(R.layout.sheet_help, null)
-    view.findViewById<TextView>(R.id.helpTitle).setText(t.title)
+    val title = view.findViewById<TextView>(R.id.helpTitle)
+    val plain = view.findViewById<TextView>(R.id.helpPlain)
+    val tech = view.findViewById<TextView>(R.id.helpTech)
+    val liveHeading = view.findViewById<TextView>(R.id.helpLiveHeading)
     view.findViewById<TextView>(R.id.helpDevice).apply {
         text = deviceName
         visibility = if (deviceName != null) View.VISIBLE else View.GONE
     }
-    view.findViewById<TextView>(R.id.helpPlain).setText(t.plain)
-    view.findViewById<TextView>(R.id.helpTech).setText(t.tech)
-    view.findViewById<TextView>(R.id.helpLiveHeading).setText(
-        if (term.aboutConnection) R.string.help_live_connection else R.string.help_live_phone
-    )
     val liveGroup = view.findViewById<View>(R.id.helpLiveGroup)
     val liveText = view.findViewById<TextView>(R.id.helpLive)
 
     val handler = Handler(Looper.getMainLooper())
+    var shownTerm: HelpTerm? = null
     var shown: List<Pair<String, String>>? = null
     val update = object : Runnable {
         override fun run() {
+            val t = termNow()
+            if (t != shownTerm) {
+                shownTerm = t
+                val tx = texts(t)
+                title.setText(tx.title)
+                plain.setText(tx.plain)
+                tech.setText(tx.tech)
+                liveHeading.setText(
+                    when (t.liveScope) {
+                        LiveScope.CONNECTION -> R.string.help_live_connection
+                        LiveScope.PHONE -> R.string.help_live_phone
+                        LiveScope.NETWORK -> R.string.help_live_network
+                    }
+                )
+            }
             val values = live()
             if (values != shown) {
                 shown = values
@@ -275,7 +291,24 @@ fun showHelp(
         }
     }
     update.run()
-    sheet.setOnDismissListener { handler.removeCallbacks(update) }
+
+    // Stop refreshing while the activity is stopped, and catch up when it starts again.
+    val owner = activity as? LifecycleOwner
+    val observer = LifecycleEventObserver { _, event ->
+        when (event) {
+            Lifecycle.Event.ON_STOP -> handler.removeCallbacks(update)
+            Lifecycle.Event.ON_START -> {
+                handler.removeCallbacks(update)
+                update.run()
+            }
+            else -> Unit
+        }
+    }
+    owner?.lifecycle?.addObserver(observer)
+    sheet.setOnDismissListener {
+        handler.removeCallbacks(update)
+        owner?.lifecycle?.removeObserver(observer)
+    }
     sheet.setContentView(view)
     sheet.show()
     return sheet

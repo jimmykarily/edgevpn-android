@@ -95,10 +95,11 @@
     <string name="sheet_copied">Device ID copied</string>
 
     <!-- Help sheets: one title, plain explanation and technical details per term -->
-    <string name="help_icon_description">What does this mean?</string>
+    <string name="help_icon_description">Help: %1$s</string>
     <string name="help_technical">Technical details</string>
     <string name="help_live_connection">This connection</string>
     <string name="help_live_phone">This phone</string>
+    <string name="help_live_network">Your network</string>
     <string name="help_live_row">%1$s: %2$s</string>
     <string name="help_connected_title">Connected</string>
     <string name="help_connected_plain">At least one of your devices can be reached from this phone right now.</string>

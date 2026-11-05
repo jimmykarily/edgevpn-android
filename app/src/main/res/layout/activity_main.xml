@@ -218,6 +218,7 @@
 
                 <TextView
                     android:id="@+id/sectionDevices"
+                    android:textAllCaps="false"
                     style="@style/TextAppearance.EdgeVPN.Section"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -247,6 +248,7 @@
 
                 <TextView
                     android:id="@+id/sectionFinding"
+                    android:textAllCaps="false"
                     style="@style/TextAppearance.EdgeVPN.Section"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
