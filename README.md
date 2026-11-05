@@ -63,7 +63,7 @@ A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the prev
 | `make emu-run` | Build the preview APK with the emulator architecture, install and launch it |
 | `make emu-shot` | Write `screenshot.png` |
 
-`scripts/emulator` has more commands: `up-windowed`, `reset`, `install`, `launch`, `stop-app`, `shot [file]`, `ui` (view hierarchy as text) and `logs`. The emulator reaches the internet through the host's NAT, never the host's local network.
+`scripts/emulator` has more commands: `up-windowed`, `reset`, `install`, `launch`, `stop-app`, `shot [file]`, `ui` (view hierarchy as text; the text of editable fields is redacted to its length) and `logs`. The emulator reaches the internet through the host's NAT, never the host's local network.
 
 The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `android/arm64`, which is what phones and CI need). `make emu-run` sets it to `android/arm64,android/amd64`. Changing the value rebuilds the AAR, so building again with a different value takes a full gomobile bind.
 

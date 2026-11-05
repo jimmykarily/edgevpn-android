@@ -46,7 +46,7 @@ die() {
 
 require_tools() {
     [ -x "$EMULATOR" ] || die "no emulator at $EMULATOR. Run: make emu-setup"
-    [ -x "$ADB" ] || die "no adb at $ADB. Run: make emu-setup"
+    [ -x "$ADB" ] || die "no adb at $ADB. Run: make emu-setup (it downloads this repo's SDK)"
 }
 
 # True while a process we started is still alive. The pid file outlives a
@@ -80,9 +80,13 @@ $(tail -20 "$LOG_FILE" 2>/dev/null)"
 }
 
 cmd_setup() {
-    [ -x "$SDKMANAGER" ] || die "no sdkmanager at $SDKMANAGER"
-    yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-    "$SDKMANAGER" --install "emulator" "platform-tools" "$IMAGE"
+    # The SDK is shared with other projects' emulators, so it is left alone
+    # when it already has what this one needs.
+    if [ ! -x "$EMULATOR" ] || [ ! -d "$ANDROID_HOME/system-images/android-35/default/x86_64" ]; then
+        [ -x "$SDKMANAGER" ] || die "no sdkmanager at $SDKMANAGER"
+        yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+        "$SDKMANAGER" --install "emulator" "$IMAGE"
+    fi
 
     if "$AVDMANAGER" list avd 2>/dev/null | grep -q "Name: $AVD_NAME\$"; then
         echo "avd $AVD_NAME already exists"
@@ -190,10 +194,22 @@ cmd_shot() {
 # The screen as text: every node with its bounds, its text and whether it
 # can be tapped. Cheaper to read than a picture and exact about what is
 # on screen, which is what a check like "is the button within the visible
-# area" needs.
+# area" needs. The text of editable fields is replaced by its length, so a
+# secret typed into one is never printed, and the dump is removed from the
+# device afterwards.
 cmd_ui() {
     "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/ui.xml >/dev/null
-    "$ADB" -s "$SERIAL" shell cat /sdcard/ui.xml
+    "$ADB" -s "$SERIAL" shell cat /sdcard/ui.xml | python3 -I -c '
+import re, sys
+xml = sys.stdin.read()
+def redact(m):
+    node = m.group(0)
+    if "class=\"android.widget.EditText\"" not in node and "password=\"true\"" not in node:
+        return node
+    return re.sub(r"\btext=\"([^\"]*)\"", lambda t: "text=\"<redacted, %d chars>\"" % len(t.group(1)), node, count=1)
+sys.stdout.write(re.sub(r"<node [^>]*>", redact, xml))
+'
+    "$ADB" -s "$SERIAL" shell rm -f /sdcard/ui.xml
 }
 
 cmd_logs() {
