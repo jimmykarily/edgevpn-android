@@ -63,9 +63,6 @@ func computeState(running bool, failure string, reachable int) string {
 	}
 }
 
-// reachableCount returns how many other devices are reachable.
-func reachableCount() int { return 0 }
-
 // recordFailure remembers why the VPN could not run. The caller must hold mu.
 func recordFailure(reason string) {
 	lastFailure = reason
