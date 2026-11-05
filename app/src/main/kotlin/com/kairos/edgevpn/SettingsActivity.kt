@@ -94,7 +94,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<View>(R.id.nameRow).setOnClickListener { editName() }
         findViewById<View>(R.id.addressRow).setOnClickListener { editAddress() }
         findViewById<View>(R.id.logsRow).setOnClickListener {
-            Toast.makeText(this, R.string.logs_coming, Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, LogsActivity::class.java))
         }
         findViewById<View>(R.id.detailedLogsRow).setOnClickListener { detailedLogsSwitch.toggle() }
         findViewById<View>(R.id.phoneIdRow).setOnClickListener { copyPhoneId() }
