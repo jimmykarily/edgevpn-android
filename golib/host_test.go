@@ -76,8 +76,64 @@ func TestStopClosesTheHostOfTheCurrentSession(t *testing.T) {
 
 	Stop()
 
-	if listening(addr) {
+	if !eventually(5*time.Second, func() bool { return !listening(addr) }) {
 		t.Error("the host still listens after Stop")
+	}
+}
+
+// slowHost is a host whose Close blocks until release is closed, like a
+// libp2p host waiting for a dial that needs the app's main thread.
+type slowHost struct {
+	host.Host
+	release chan struct{}
+	closed  chan struct{}
+}
+
+func (h *slowHost) Close() error {
+	<-h.release
+	err := h.Host.Close()
+	close(h.closed)
+	return err
+}
+
+func TestStopReturnsBeforeTheHostHasClosed(t *testing.T) {
+	t.Cleanup(Stop)
+	n := newTestNode(t)
+	inner, _ := newLoopbackHost(t)
+	h := &slowHost{Host: inner, release: make(chan struct{}), closed: make(chan struct{})}
+	fakeHosts(t, map[*node.Node]host.Host{n: h})
+	mu.Lock()
+	currentNode, hostReady, cancelFn = n, true, func() {}
+	mu.Unlock()
+
+	returned := make(chan struct{})
+	go func() { Stop(); close(returned) }()
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		close(h.release)
+		t.Fatal("Stop waited for the host to close")
+	}
+
+	close(h.release)
+	select {
+	case <-h.closed:
+	case <-time.After(5 * time.Second):
+		t.Error("the host was never closed after Stop")
+	}
+}
+
+// eventually reports whether cond becomes true within d.
+func eventually(d time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if cond() {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 

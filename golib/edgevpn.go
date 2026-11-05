@@ -303,10 +303,14 @@ func closeTunOnError(reason string) {
 	tunFile = nil
 }
 
-// Stop shuts down the VPN, closes the libp2p host and closes the TUN file
-// descriptor. Closing the fd tells Android the VPN interface is gone so it
-// tears down routing. The host is closed only when it was marked ready; a
+// Stop shuts down the VPN, closes the TUN file descriptor and starts closing
+// the libp2p host. Closing the fd tells Android the VPN interface is gone so
+// it tears down routing. The host is closed only when it was marked ready; a
 // session stopped earlier closes its own host in hostReadyService.
+//
+// Stop returns without waiting for the host to close. The app calls Stop on
+// its main thread, and closing the host waits for dials in progress, each of
+// which protects its socket through the main thread.
 func Stop() {
 	mu.Lock()
 	var hostToClose *node.Node
@@ -331,7 +335,9 @@ func Stop() {
 		tunFile = nil
 	}
 	mu.Unlock()
-	closeNodeHost(hostToClose)
+	if hostToClose != nil {
+		go closeHost(hostOf(hostToClose))
+	}
 }
 
 // Status returns "off", "looking", "connected" or "problem".
