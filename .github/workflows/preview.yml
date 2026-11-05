@@ -1,0 +1,109 @@
+name: Preview APK
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# A newer push to the same pull request or to main makes the running build
+# pointless, so it is cancelled.
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # An APK for every pull request and every push to main, to install on a
+  # phone straight from the run's summary page. It is the preview build type
+  # from app/build.gradle.kts: a debug build named "EdgeVPN preview" under the
+  # application id com.kairos.edgevpn.preview, so it sits next to a released
+  # app instead of replacing it.
+  preview-apk:
+    name: Build preview APK
+    runs-on: ubuntu-latest
+    env:
+      # The runner has its own Android SDK and points ANDROID_HOME at it. The
+      # Makefile would then use that SDK, which lacks the NDK version it
+      # needs. Pointing it at binaries/ makes the Makefile install exactly
+      # the SDK packages it lists, and the cache below keeps them.
+      ANDROID_HOME: ${{ github.workspace }}/binaries/android-sdk
+      # The key's name inside the keystore. It is not sensitive, and it is
+      # kept out of the secrets on purpose: GitHub replaces every occurrence
+      # of a secret's value in a job's logs with ***, and "edgevpn" appears in
+      # package names, paths and the APK's name.
+      EDGEVPN_RELEASE_KEY_ALIAS: edgevpn
+    steps:
+      - uses: actions/checkout@v7
+
+      # A pull request's APK is named for its number, and one built from
+      # main for its commit, so a download says which build it is.
+      - name: Name the APK
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            echo "APK_NAME=edgevpn-preview-pr$PR_NUMBER.apk" >> "$GITHUB_ENV"
+          else
+            echo "APK_NAME=edgevpn-preview-main-${GITHUB_SHA::7}.apk" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: golib/go.mod
+          cache-dependency-path: golib/go.sum
+
+      # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
+      # downloads into binaries/. They are about 1.5GB and the same bytes on
+      # every run. The Makefile pins every version, and go.mod pins gomobile,
+      # so a change to either one is a new cache.
+      - name: Cache the build tools
+        uses: actions/cache@v5
+        with:
+          path: binaries
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      # Signed with the release key so each preview installs over the one
+      # before it. A pull request that gets no secrets, such as one opened by
+      # Dependabot, has an empty value here, and the build falls back to the
+      # runner's debug key; that APK installs only on a phone that has no
+      # preview on it yet.
+      - name: Write the keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "EDGEVPN_RELEASE_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          else
+            echo "No signing secret; the preview is signed with a debug key."
+          fi
+
+      - name: Build the preview APK
+        env:
+          EDGEVPN_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEYSTORE_PASSWORD }}
+          EDGEVPN_RELEASE_KEY_PASSWORD: ${{ secrets.EDGEVPN_RELEASE_KEY_PASSWORD }}
+        run: |
+          make preview
+          mv app/build/outputs/apk/preview/app-preview.apk \
+            "app/build/outputs/apk/preview/$APK_NAME"
+
+      - name: Remove the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      # Uploaded as the bare APK rather than inside a zip, so a phone's
+      # browser downloads something it can install.
+      - name: Upload the APK
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: app/build/outputs/apk/preview/${{ env.APK_NAME }}
+          archive: false
+          retention-days: 14
+
+      - name: Link the APK from the run summary
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts/$ARTIFACT_ID"
+          echo "Install on a phone: [$APK_NAME]($url)" >> "$GITHUB_STEP_SUMMARY"
