@@ -1,0 +1,109 @@
+<style>
+  .phones { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; margin-top:18px; align-items:flex-start; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .col h3 { margin:0; font-size:16px; }
+  .col p.desc { margin:0; max-width:300px; font-size:13px; color:#555; text-align:center; line-height:1.4; }
+  .phone { width:300px; height:700px; border-radius:34px; background:#111; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .screen { position:relative; width:100%; height:100%; border-radius:26px; background:#f6f7fb; overflow:hidden; display:flex; flex-direction:column; font-family:Roboto, system-ui, sans-serif; color:#1b1d23; }
+  .sb { height:22px; font-size:11px; display:flex; justify-content:space-between; padding:4px 16px 0; color:#333; }
+  .appbar { padding:6px 16px 8px; font-size:18px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .appbar .ic { font-size:18px; color:#666; }
+  .body { flex:1; overflow:hidden; padding:0 12px; display:flex; flex-direction:column; gap:10px; }
+  .hero { border-radius:20px; padding:14px 16px; color:#fff; background:linear-gradient(135deg,#16a34a,#0d9488); }
+  .hero .row { display:flex; justify-content:space-between; align-items:center; }
+  .hero .big { font-size:19px; font-weight:700; }
+  .hero .small { font-size:12.5px; opacity:.92; margin-top:3px; }
+  .hero .btn { background:rgba(255,255,255,.22); padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:600; }
+  .me { display:flex; gap:8px; margin-top:10px; }
+  .me div { background:rgba(255,255,255,.18); border-radius:12px; padding:6px 10px; font-size:11px; flex:1; }
+  .me b { display:block; font-size:13px; }
+  .sec { font-size:11px; font-weight:700; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; margin:2px 4px 0; display:flex; align-items:center; gap:5px; }
+  .card { background:#fff; border-radius:16px; padding:6px 12px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .dev { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eef0f4; }
+  .dev:last-child { border-bottom:0; }
+  .av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; flex:none; }
+  .dev .t { flex:1; min-width:0; } .dev .n { font-weight:600; font-size:13.5px; } .dev .s { font-size:11.5px; color:#6b7280; }
+  .chip { font-size:10.5px; font-weight:700; padding:4px 8px; border-radius:999px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+  .g { background:#dcfce7; color:#166534; } .a { background:#fef3c7; color:#92400e; } .x { background:#eceef2; color:#6b7280; }
+  .gbg { background:#dcfce7; } .abg { background:#fef3c7; } .xbg { background:#eceef2; }
+  .health { display:flex; gap:8px; }
+  .health .card { flex:1; text-align:center; padding:9px 6px; }
+  .health b { display:block; font-size:17px; }
+  .health span { font-size:10.5px; color:#6b7280; line-height:1.3; }
+  .q { display:inline-flex; width:14px; height:14px; border-radius:50%; font-size:9.5px; font-weight:700; align-items:center; justify-content:center; border:1.3px solid currentColor; opacity:.7; flex:none; vertical-align:-2px; }
+  .hero .q { color:#fff; }
+  .hl { outline:2px solid #7c3aed; outline-offset:2px; border-radius:50%; opacity:1; }
+  .scrim { position:absolute; inset:0; background:rgba(0,0,0,.35); }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:22px 22px 0 0; padding:10px 18px 22px; box-shadow:0 -6px 20px rgba(0,0,0,.18); }
+  .grab { width:40px; height:4px; background:#d1d5db; border-radius:4px; margin:0 auto 12px; }
+  .sheet h4 { margin:0 0 6px; font-size:16px; display:flex; align-items:center; gap:8px; }
+  .sheet p { font-size:12.5px; line-height:1.5; color:#374151; margin:0 0 10px; }
+  .sheet .tech { background:#f3f4f6; border-radius:12px; padding:10px 12px; font-size:11.5px; line-height:1.55; color:#374151; }
+  .sheet .tech b { color:#111; }
+  .sheet .mono { font-family:monospace; font-size:10.5px; word-break:break-all; color:#0f766e; }
+  .lbl { font-size:10px; font-weight:700; letter-spacing:.06em; color:#6b7280; text-transform:uppercase; margin-bottom:4px; }
+</style>
+
+<h2>(?) next to each plain-language term</h2>
+<p class="subtitle">Left: where the (?) icons sit on the main screen. They are small and faded so the screen stays calm. Right: what you see after tapping the (?) next to "Via helper": the plain explanation first, then the technical details, with the live values for that device where they exist.</p>
+
+<div class="phones">
+
+  <div class="col">
+    <div class="phone"><div class="screen">
+      <div class="sb"><span>15:19</span><span>Wi-Fi ▾ 🔋</span></div>
+      <div class="appbar">EdgeVPN <span class="ic">⋮</span></div>
+      <div class="body">
+        <div class="hero">
+          <div class="row"><div class="big">✓ Connected <span class="q">?</span></div><div class="btn">Turn off</div></div>
+          <div class="small">You can reach 2 of your 3 devices.</div>
+          <div class="me">
+            <div>This phone <span class="q">?</span><b>10.1.0.2</b></div>
+            <div>Using <span class="q">?</span><b>Wi-Fi</b></div>
+          </div>
+        </div>
+        <div class="sec">Your devices <span class="q">?</span></div>
+        <div class="card">
+          <div class="dev"><div class="av gbg">🖥</div><div class="t"><div class="n">desktop</div><div class="s">10.1.0.1 · same Wi-Fi as you</div></div><span class="chip g">Direct <span class="q">?</span></span></div>
+          <div class="dev"><div class="av abg">💻</div><div class="t"><div class="n">laptop</div><div class="s">10.1.0.3 · over the internet</div></div><span class="chip a">Via helper <span class="q hl">?</span></span></div>
+          <div class="dev"><div class="av xbg">🗄</div><div class="t"><div class="n">home-server</div><div class="s">10.1.0.4 · last seen 2 h ago</div></div><span class="chip x">Offline <span class="q">?</span></span></div>
+        </div>
+        <div class="sec">Finding your devices <span class="q">?</span></div>
+        <div class="health">
+          <div class="card"><b>143</b><span>public helpers available <span class="q">?</span></span></div>
+          <div class="card"><b>4 s</b><span>last heard from your network <span class="q">?</span></span></div>
+        </div>
+        <p style="font-size:11px;color:#6b7280;margin:0 4px">(Map left out here to keep the picture short; its legend gets the same (?) icons.)</p>
+      </div>
+    </div></div>
+    <h3>Where the (?) icons go</h3>
+    <p class="desc">One per term, the first time it appears on screen: status, the two pills, section titles, badges and tiles.</p>
+  </div>
+
+  <div class="col">
+    <div class="phone"><div class="screen">
+      <div class="sb"><span>15:19</span><span>Wi-Fi ▾ 🔋</span></div>
+      <div class="appbar">EdgeVPN <span class="ic">⋮</span></div>
+      <div class="body" style="opacity:.5">
+        <div class="hero"><div class="big">✓ Connected</div><div class="small">You can reach 2 of your 3 devices.</div></div>
+        <div class="card" style="height:140px"></div>
+      </div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h4><span class="chip a">Via helper</span> laptop</h4>
+        <p>Your phone and the laptop can't reach each other directly, usually because both are behind a home router or a mobile network. Their traffic passes through another computer on the internet that offered to help. It works, but it is slower, and the helper may limit how long the connection lasts.</p>
+        <div class="tech">
+          <div class="lbl">Technical details</div>
+          Connection is a <b>libp2p circuit relay v2</b> connection (multiaddr contains <b>/p2p-circuit</b>). Relayed connections are usually <b>limited</b> by the relay (default: 2 minutes, 128 KiB). libp2p tries <b>hole punching (DCUtR)</b> to upgrade to a direct connection.<br><br>
+          <div class="lbl" style="margin-top:2px">This connection</div>
+          <div class="mono">/ip4/65.21.90.217/tcp/4001/p2p/12D3KooW9ySG…bd5BK/p2p-circuit</div>
+          Limited: <b>yes</b> · Open for: <b>48 s</b>
+        </div>
+      </div>
+    </div></div>
+    <h3>After tapping (?)</h3>
+    <p class="desc">A sheet slides up: plain explanation first, then the technical terms and, where it applies, the live values for that device.</p>
+  </div>
+
+</div>
