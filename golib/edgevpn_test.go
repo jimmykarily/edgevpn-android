@@ -44,8 +44,12 @@ func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	if cfg.Address != "10.1.0.2/24" {
 		t.Errorf("Address = %q, want 10.1.0.2/24", cfg.Address)
 	}
-	if !cfg.Discovery.DHT || !cfg.Discovery.MDNS {
-		t.Errorf("Discovery DHT = %v, MDNS = %v, want both true", cfg.Discovery.DHT, cfg.Discovery.MDNS)
+	if !cfg.Discovery.DHT {
+		t.Error("Discovery.DHT = false, want true")
+	}
+	// The app runs mDNS itself, only on Wi-Fi or Ethernet (see mdns.go).
+	if cfg.Discovery.MDNS {
+		t.Error("Discovery.MDNS = true, want false so edgevpn does not start its own mDNS")
 	}
 }
 
