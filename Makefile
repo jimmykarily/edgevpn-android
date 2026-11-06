@@ -226,7 +226,15 @@ e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	for p in com.kairos.edgevpn.test com.kairos.edgevpn; do \
 	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) uninstall $$p >/dev/null 2>&1 || true; \
 	done
-	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
+	ANDROID_SERIAL=$(ANDROID_SERIAL) EDGEVPN_ADB=$(ANDROID_HOME)/platform-tools/adb scripts/settle-emulator
+	# On failure, what had the focus and what was on screen, next to the test
+	# reports that CI uploads: a test that cannot get the focus says nothing
+	# about which window took it.
+	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest || { \
+	  mkdir -p app/build/reports/androidTests; \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' > app/build/reports/androidTests/focus.txt || true; \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) exec-out screencap -p > app/build/reports/androidTests/screen-after-failure.png || true; \
+	  exit 1; }
 
 # ── Test peer ────────────────────────────────────────────────────
 # A disposable QEMU VM running edgevpn with a temporary key, driven by
