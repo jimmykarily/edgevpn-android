@@ -253,7 +253,8 @@ peer-status:
 # peer's network, pings it both ways, turns off for longer than the peer's
 # ownership TTL and checks that traffic comes back after turning on again.
 # scripts/network-test starts the peer when it is not running.
-# NETWORK_TEST_LONG=0 skips the off/on part.
+# NETWORK_TEST_LONG=0 skips the off/on part, NETWORK_TEST_SWITCH=0 the Wi-Fi and
+# airplane mode switching part.
 network-test:
 	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
 	ANDROID_SERIAL=$(ANDROID_SERIAL) scripts/network-test
