@@ -205,6 +205,36 @@ listen_sockets() {
     adb_ shell cat /proc/net/tcp /proc/net/tcp6 | awk -v uid="$uid" '$4 == "0A" && $8 == uid' | wc -l
 }
 
+# Writes dumpsys connectivity (scrubbed of the key) to $OUT/connectivity.txt
+# and prints the routes of the app's VPN network, one per line, e.g.
+# "10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0".
+vpn_routes() {
+    adb_ shell dumpsys connectivity | tr -d '\r' | scrub >"$OUT/connectivity.txt"
+    python3 -I -c '
+import re, sys
+for line in open(sys.argv[1], errors="replace"):
+    if "NetworkAgentInfo" in line and re.search(r"extra: VPN:" + re.escape(sys.argv[2]) + r"(\}|\s)", line):
+        m = re.search(r"Routes: \[([^\]]*)\]", line)
+        if m:
+            print("\n".join(r.strip() for r in m.group(1).split(",")))
+' "$OUT/connectivity.txt" "$PACKAGE"
+}
+
+# Fails when the VPN network has an unreachable IPv6 default route, which
+# makes Android block IPv6 for every app while the VPN is on. The VPN carries
+# only 10.1.0.0/24, so IPv6 is allowed to bypass it (EdgeVpnService). With
+# Android's "Always-on VPN, block connections without VPN" IPv6 may now
+# bypass the VPN too; that is acceptable here and untested.
+check_vpn_routes() {
+    local routes
+    routes=$(vpn_routes)
+    [ -n "$routes" ] || fail "no VPN network with routes in dumpsys connectivity; the dumpsys format may have changed, see $OUT/connectivity.txt"
+    log "VPN routes: $(echo "$routes" | paste -sd' ')"
+    if echo "$routes" | grep -Eq '^(::/0|0::/0).*unreachable'; then
+        fail "the VPN blocks IPv6 for every app: route $(echo "$routes" | grep unreachable | head -n 1)"
+    fi
+}
+
 # Exits 0 when the peer lists the app, 1 when it does not, and fails the
 # test when the peer cannot be asked, so an SSH or API error never reads as
 # "not listed".
@@ -319,6 +349,8 @@ main() {
     log "connected after ${took}s"
     shot connected
 
+    check_vpn_routes
+
     ping_until app "$PEER_ADDRESS" 60 || fail "the app cannot ping the peer"
     ping_until peer "$APP_ADDRESS" 60 || fail "the peer cannot ping the app"
     local sockets
@@ -342,6 +374,7 @@ main() {
         log "turned on again"
         took=$(wait_for "Connected" "$RECOVER_TIMEOUT") || { shot not-reconnected; fail "not connected again after ${RECOVER_TIMEOUT}s"; }
         log "connected again after ${took}s"
+        check_vpn_routes
         ping_until app "$PEER_ADDRESS" "$RECOVER_TIMEOUT" || fail "the app cannot ping the peer after off and on"
         ping_until peer "$APP_ADDRESS" "$RECOVER_TIMEOUT" || fail "the peer cannot ping the app after off and on"
         local after

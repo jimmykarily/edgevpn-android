@@ -102,7 +102,7 @@ The first `up` downloads the cloud image and builds edgevpn at the version `goli
 
 ## Network test
 
-`make network-test` checks the app on a real network: the debug app on the emulator joins the test peer's network, both sides ping each other, and the VPN is turned off for 90 seconds (longer than the peer's ownership TTL, so the peer drops the app from its machine list) and on again, after which pings must work again and the app must still have exactly two listening sockets. That last part guards against an old libp2p host staying alive after the VPN stops.
+`make network-test` checks the app on a real network: the debug app on the emulator joins the test peer's network, the VPN network has no unreachable IPv6 route (which would block IPv6 for every app), both sides ping each other, and the VPN is turned off for 90 seconds (longer than the peer's ownership TTL, so the peer drops the app from its machine list) and on again, after which pings must work again and the app must still have exactly two listening sockets. With Android's "Always-on VPN, block connections without VPN" IPv6 may now bypass the VPN; that is acceptable because the VPN carries only 10.1.0.0/24, and it is untested. The off and on part guards against an old libp2p host staying alive after the VPN stops.
 
 ```bash
 make emu-up         # start the emulator, once
