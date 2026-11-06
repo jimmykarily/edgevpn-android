@@ -52,6 +52,9 @@ type snapshotJSON struct {
 	Devices   []deviceJSON   `json:"devices"`
 	Helpers   int            `json:"helpers"`
 	LastHeard *lastHeardJSON `json:"lastHeard,omitempty"`
+	// AddressInUse is true while another device claims this phone's address
+	// (see addressInUseWindow).
+	AddressInUse bool `json:"addressInUse,omitempty"`
 }
 
 // snapshotInput is everything buildSnapshot needs, gathered by the caller.
@@ -66,6 +69,9 @@ type snapshotInput struct {
 	Conns                    map[string][]connInfo
 	ConnectedPeers           []string
 	LocalNets                []*net.IPNet
+	// AddressRejectedAt is when this node last rejected another peer's
+	// machines entry at SelfAddress, zero if never.
+	AddressRejectedAt time.Time
 }
 
 func unixOrZero(t time.Time) int64 {
@@ -86,6 +92,8 @@ func buildSnapshot(in snapshotInput) snapshotJSON {
 		FailedAt:  unixOrZero(in.FailedAt),
 		Self:      selfJSON{ID: in.SelfID, Address: in.SelfAddress, Name: in.SelfName},
 		Devices:   []deviceJSON{},
+		AddressInUse: !in.AddressRejectedAt.IsZero() &&
+			in.Now.Sub(in.AddressRejectedAt) < addressInUseWindow,
 	}
 
 	deviceIDs := map[string]bool{}
@@ -199,13 +207,16 @@ func collectSnapshot() snapshotInput {
 	in := snapshotInput{
 		StartedAt:   startedAt,
 		FailedAt:    failedAt,
-		Now:         time.Now(),
+		Now:         clock(),
 		Failure:     lastFailure,
 		Detail:      failureDetail,
 		SelfAddress: selfAddress,
 		SelfName:    selfName,
 	}
 	mu.Unlock()
+	if in.SelfAddress != "" {
+		in.AddressRejectedAt = rejectedAt(in.SelfAddress)
+	}
 
 	if n != nil {
 		readNetwork(n, ready, &in)

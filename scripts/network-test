@@ -19,6 +19,11 @@
 # NETWORK_TEST_MDNS_CHECK=0 skips the mDNS checks: no fresh
 # "mdns(android): using interfaces:" line while Wi-Fi is off, and a fresh one
 # listing wlan0 after Wi-Fi is back.
+#
+# NETWORK_TEST_SCENARIO=address-in-use runs another check instead: the peer
+# moves to the app's address before the app turns on, and the app must warn
+# that another device already uses its address. The peer gets its usual
+# address back at the end.
 
 set -euo pipefail
 
@@ -46,13 +51,19 @@ LONG="${NETWORK_TEST_LONG:-1}"
 SWITCH="${NETWORK_TEST_SWITCH:-1}"
 SWITCH_TIMEOUT="${NETWORK_TEST_SWITCH_TIMEOUT:-60}"
 MDNS_CHECK="${NETWORK_TEST_MDNS_CHECK:-1}"
-OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
+SCENARIO="${NETWORK_TEST_SCENARIO:-basic}"
+case "$SCENARIO" in
+    basic) OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}" ;;
+    address-in-use) OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test/address-in-use}" ;;
+    *) echo "unknown NETWORK_TEST_SCENARIO: $SCENARIO" >&2; exit 2 ;;
+esac
 
 TESTPEER="$ROOT/scripts/testpeer"
 EMULATOR="$ROOT/scripts/emulator"
 STARTED_PEER=0
 # 1 once this run has restarted adbd as root; finish puts it back.
 ROOTED=0
+MOVED_PEER=0
 T0=$(date +%s)
 
 log() { echo "[network-test +$(($(date +%s) - T0))s] $*"; }
@@ -387,6 +398,18 @@ restore_network() {
     adb_ shell svc wifi enable >/dev/null 2>&1
 }
 
+# The basic scenario has one device per address, so the warning that
+# another device uses the app's address must never be on screen. After off
+# and on the app rejects the peer's deletion of its old entry, which must
+# not count as a clash.
+no_address_warning() {
+    if on_screen "Another device already uses $APP_ADDRESS. Pick another address in Settings."; then
+        shot address-warning
+        fail "the app warns that another device uses $APP_ADDRESS, but only the peer at $PEER_ADDRESS is in the network"
+    fi
+    log "no address warning on screen"
+}
+
 finish() {
     local status=$?
     trap - EXIT
@@ -401,6 +424,8 @@ finish() {
     fi
     if [ "$STARTED_PEER" = 1 ]; then
         "$TESTPEER" down
+    elif [ "$MOVED_PEER" = 1 ]; then
+        "$TESTPEER" readdress "$PEER_ADDRESS"
     fi
     if [ "$status" -eq 0 ]; then
         log "PASS"
@@ -486,6 +511,39 @@ ensure_wifi() {
     log "joined AndroidWifi"
 }
 
+# The address-in-use scenario. The peer takes the app's address first, so
+# its entry in the shared machine list is the one every device keeps, and
+# the app, turned on afterwards, must say that another device uses it.
+address_in_use() {
+    local peer_id="${1##*/}" warning="Another device already uses $APP_ADDRESS. Pick another address in Settings." took i
+    MOVED_PEER=1
+    "$TESTPEER" readdress "$APP_ADDRESS"
+    for i in $(seq 1 30); do
+        "$TESTPEER" machines | grep -q "^$APP_ADDRESS $peer_id\$" && break
+        [ "$i" -lt 30 ] || fail "the peer does not list itself at $APP_ADDRESS after 60s"
+        sleep 2
+    done
+    log "the peer holds $APP_ADDRESS"
+
+    dismiss_dialogs
+    adb_ shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null
+    wait_for "Turn on" 30 >/dev/null || fail "the main screen did not show Turn on"
+    tap "Turn on"
+    log "turned on"
+    took=$(wait_for "$warning" "$CONNECT_TIMEOUT") || { shot no-warning; fail "no address warning after ${CONNECT_TIMEOUT}s"; }
+    log "the app warns that $APP_ADDRESS is in use after ${took}s"
+    on_screen "Looking for your devices" || fail "the app does not say it is looking for devices"
+    no_protect_failures
+    shot address-in-use
+
+    tap "Change address"
+    wait_for "Address in your network" 10 >/dev/null || fail "Change address did not open Settings"
+    shot change-address
+    adb_ shell input keyevent KEYCODE_BACK
+    wait_for "Turn off" 10 >/dev/null || fail "the main screen did not come back"
+    "$TESTPEER" machines | sed 's/^/[peer machines] /'
+}
+
 main() {
     rm -rf "$OUT"
     mkdir -p "$OUT"
@@ -539,6 +597,11 @@ main() {
     # here instead, as the dialog would.
     adb_ shell appops set "$PACKAGE" ACTIVATE_VPN allow
 
+    if [ "$SCENARIO" = address-in-use ]; then
+        address_in_use "$peer"
+        return
+    fi
+
     dismiss_dialogs
     adb_ shell am start -W -n "$PACKAGE/.MainActivity" >/dev/null
     wait_for "Turn on" 30 >/dev/null || fail "the main screen did not show Turn on"
@@ -560,6 +623,7 @@ main() {
     [ "$sockets" -gt 0 ] || fail "the app has no listening sockets"
     peer_has_app || fail "the peer does not list $APP_ADDRESS while connected"
     log "the peer lists $APP_ADDRESS"
+    no_address_warning
     screens
 
     if [ "$SWITCH" != 0 ]; then
@@ -616,6 +680,7 @@ main() {
         after=$(listen_sockets) || fail "could not find the app's uid"
         log "app LISTEN sockets after off and on: $after (before: $sockets)"
         [ "$after" -eq "$sockets" ] || fail "the app has $after listening sockets after off and on, want $sockets as before"
+        no_address_warning
     fi
 
     no_protect_failures

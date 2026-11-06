@@ -45,6 +45,10 @@ object Snapshots {
         lastHeard = JSONObject().put("at", now - 30).put("name", "desktop"),
     ).toString()
 
+    /** Looking for devices while another device claims this phone's address 10.1.0.2. */
+    fun lookingWithAddressInUse(now: Long = now()): String =
+        snapshot(state = "looking", startedAt = now - 40, helpers = 3).put("addressInUse", true).toString()
+
     fun problem(error: String, now: Long = now()): String =
         snapshot(state = "problem", error = error, failedAt = now - 20).toString()
 

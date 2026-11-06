@@ -57,7 +57,7 @@ FORCE:
 .DELETE_ON_ERROR:
 
 # ── Phony targets ────────────────────────────────────────────────
-.PHONY: all golib app preview release test lint install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test FORCE
+.PHONY: all golib app preview release test lint install logs setup clean distclean emu-setup emu-up emu-down emu-status emu-run emu-shot e2e e2e-build peer-up peer-down peer-status network-test network-test-address-in-use FORCE
 
 all: app
 
@@ -259,6 +259,12 @@ peer-status:
 network-test:
 	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
 	ANDROID_SERIAL=$(ANDROID_SERIAL) scripts/network-test
+
+# The same setup, then the peer moves to the app's address before the app
+# turns on, and the app must warn that another device uses its address.
+network-test-address-in-use:
+	$(MAKE) e2e-apks GOMOBILE_TARGETS=$(E2E_TARGETS)
+	ANDROID_SERIAL=$(ANDROID_SERIAL) NETWORK_TEST_SCENARIO=address-in-use scripts/network-test
 
 # ── Install on device ────────────────────────────────────────────
 install: $(APK)

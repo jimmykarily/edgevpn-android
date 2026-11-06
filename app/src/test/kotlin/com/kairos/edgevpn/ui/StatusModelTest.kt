@@ -1,7 +1,9 @@
 package com.kairos.edgevpn.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StatusModelTest {
@@ -140,5 +142,12 @@ class StatusModelTest {
         assertEquals(Ago.Minutes(5), formatAgo(300))
         assertEquals(Ago.Hours(2), formatAgo(7200))
         assertEquals(Ago.Days(2), formatAgo(2 * 86400L))
+    }
+
+    @Test
+    fun readsWhetherAnotherDeviceClaimsThisPhonesAddress() {
+        val clash = snapshot("", state = "looking").replace("\"helpers\":3", "\"helpers\":3,\"addressInUse\":true")
+        assertTrue(parseStatus(clash, 1000).addressInUse)
+        assertFalse(parseStatus(snapshot(""), 1000).addressInUse)
     }
 }

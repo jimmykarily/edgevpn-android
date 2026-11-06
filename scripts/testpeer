@@ -276,6 +276,25 @@ for m in json.load(sys.stdin) or []:
 '
 }
 
+# Restarts the VM's edgevpn with the VPN address $1 instead of the one it
+# runs with, and waits until the VPN interface has it. The VM keeps its
+# libp2p identity, and its ledger starts empty because edgevpn keeps it in
+# memory only. "readdress 10.1.0.10" puts the usual address back.
+cmd_readdress() {
+    local addr="${1:-}" waited=0
+    [[ "$addr" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "usage: scripts/testpeer readdress <IPv4 address>"
+    running || die "the VM is not running. Run: scripts/testpeer up"
+    vm "sudo sed -i -E 's#--address [0-9.]+/24#--address $addr/24#' /etc/systemd/system/edgevpn.service &&
+        sudo systemctl daemon-reload && sudo systemctl restart edgevpn" ||
+        die "could not restart edgevpn with $addr"
+    until vm "ip -4 addr show edgevpn0 2>/dev/null | grep -q 'inet $addr/'" 2>/dev/null; do
+        [ "$waited" -lt 60 ] || die "edgevpn0 does not have $addr after 60s. See: scripts/testpeer logs"
+        sleep 2
+        waited=$((waited + 2))
+    done
+    echo "peer at $addr"
+}
+
 # The VM's libp2p address as the emulator reaches it.
 cmd_addr() {
     local id
@@ -299,6 +318,8 @@ usage: scripts/testpeer <command>
   key           the path of the temporary key file (never its contents)
   machines      the devices in the VM's machine list, as "address peer-id"
   addr          the VM's libp2p address as seen from the Android emulator
+  readdress <addr>
+                restart the VM's edgevpn with another VPN address
 USAGE
 }
 
@@ -313,5 +334,6 @@ case "${1:-}" in
     key) cmd_key ;;
     machines) cmd_machines ;;
     addr) cmd_addr ;;
+    readdress) cmd_readdress "${2:-}" ;;
     *) usage; exit 1 ;;
 esac
