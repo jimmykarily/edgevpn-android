@@ -286,7 +286,7 @@ mdns_wlan0_lines() {
 # Runs the network change in $2 (a command string run with eval), then
 # measures the seconds until the app and the peer can ping each other, and
 # fails when that takes longer than SWITCH_TIMEOUT. $1 names the step in the
-# log.
+# log. The action may set start again to time only the part after it.
 switch_step() {
     local name="$1" action="$2" start now left
     log "switch $name: starting"
@@ -297,7 +297,9 @@ switch_step() {
     left=$((SWITCH_TIMEOUT - (now - start)))
     [ "$left" -ge 1 ] || left=1
     ping_until peer "$APP_ADDRESS" "$left" || fail "switch $name: the peer cannot ping the app within ${SWITCH_TIMEOUT}s"
-    log "switch $name: $(($(date +%s) - start))s"
+    now=$(($(date +%s) - start))
+    log "switch $name: ${now}s"
+    [ "$now" -le "$SWITCH_TIMEOUT" ] || fail "switch $name: ${now}s is above ${SWITCH_TIMEOUT}s"
 }
 
 # Waits up to 30 seconds until wlan0 has (state "up") or has lost (state
@@ -313,6 +315,7 @@ wait_wlan0() {
         fi
         sleep 1
     done
+    return 1
 }
 
 # Puts Wi-Fi on and airplane mode off, whatever state a step left them in.
@@ -469,9 +472,9 @@ main() {
 
     if [ "$SWITCH" != 0 ]; then
         local mdns_before
-        switch_step wifi-off 'adb_ shell svc wifi disable; wait_wlan0 down'
+        switch_step wifi-off 'adb_ shell svc wifi disable; wait_wlan0 down || fail "wlan0 did not go down"'
         mdns_before=$(mdns_wlan0_lines)
-        switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up'
+        switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up || fail "wlan0 did not come up"'
         if [ "$MDNS_CHECK" != 0 ]; then
             local waited=0
             until [ "$(mdns_wlan0_lines)" -gt "$mdns_before" ]; do
@@ -481,7 +484,13 @@ main() {
             done
             log "the app restarted mDNS on wlan0 after Wi-Fi came back"
         fi
-        switch_step airplane 'adb_ shell cmd connectivity airplane-mode enable; sleep 10; adb_ shell cmd connectivity airplane-mode disable'
+        switch_step airplane 'adb_ shell cmd connectivity airplane-mode enable
+            [ "$(adb_ shell settings get global airplane_mode_on | tr -d "\r")" = 1 ] || fail "airplane mode did not turn on"
+            wait_wlan0 down || fail "wlan0 did not go down in airplane mode"
+            sleep 10
+            start=$(date +%s)
+            adb_ shell cmd connectivity airplane-mode disable
+            wait_wlan0 up || fail "wlan0 did not come back after airplane mode"'
     fi
 
     if [ "$LONG" != 0 ]; then
