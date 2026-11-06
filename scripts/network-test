@@ -16,7 +16,7 @@
 # NETWORK_TEST_SWITCH=0 skips the part that switches the emulator's network
 # (Wi-Fi off, Wi-Fi on, airplane mode); NETWORK_TEST_SWITCH_TIMEOUT is the
 # number of seconds each step has to get pings working both ways again.
-# NETWORK_TEST_MDNS_CHECK=1 also requires the app to log a fresh
+# NETWORK_TEST_MDNS_CHECK=0 skips the check that the app logs a fresh
 # "mdns(android): using interfaces:" line listing wlan0 after Wi-Fi is back.
 
 set -euo pipefail
@@ -44,7 +44,7 @@ OFF_SECONDS="${NETWORK_TEST_OFF_SECONDS:-100}"
 LONG="${NETWORK_TEST_LONG:-1}"
 SWITCH="${NETWORK_TEST_SWITCH:-1}"
 SWITCH_TIMEOUT="${NETWORK_TEST_SWITCH_TIMEOUT:-60}"
-MDNS_CHECK="${NETWORK_TEST_MDNS_CHECK:-0}"
+MDNS_CHECK="${NETWORK_TEST_MDNS_CHECK:-1}"
 OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
 
 TESTPEER="$ROOT/scripts/testpeer"

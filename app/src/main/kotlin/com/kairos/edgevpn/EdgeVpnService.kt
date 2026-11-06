@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Network
 import android.net.VpnService
 import android.net.wifi.WifiManager
 import android.os.Handler
@@ -37,6 +38,7 @@ class EdgeVpnService : VpnService() {
 
     private var tunPfd: ParcelFileDescriptor? = null
     private var multicastLock: WifiManager.MulticastLock? = null
+    private var networkWatcher: UnderlyingNetworkWatcher? = null
 
     /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
      * It runs on the calling thread: protect() is a binder call to the system, and a hop
@@ -196,10 +198,23 @@ class EdgeVpnService : VpnService() {
             isRunning = true
             mainHandler.postDelayed(statusTicker, TICK_MS)
             Log.i(TAG, "VPN started")
+            val mySession = session
+            networkWatcher = UnderlyingNetworkWatcher(this) { network, local ->
+                onUnderlyingNetwork(mySession, network, local)
+            }.also { it.start() }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start VPN", e)
             failStart("The VPN could not start with this network key. The logs have the details.")
         }
+    }
+
+    /** Tells Android which network the VPN rides on, so other apps and Settings see its
+     * transport and metered state, then tells Go so it can drop dead connections, redial
+     * and run mDNS only on a local network. */
+    private fun onUnderlyingNetwork(mySession: Int, network: Network?, local: Boolean) {
+        if (mySession != session || !isRunning) return
+        setUnderlyingNetworks(network?.let { arrayOf(it) })
+        Edgevpn.networkChanged(local)
     }
 
     /** Tells Go why the start failed, then tears everything down. */
@@ -219,6 +234,8 @@ class EdgeVpnService : VpnService() {
     private fun teardown() {
         isRunning = false
         tunPfd = null
+        networkWatcher?.stop()
+        networkWatcher = null
         Edgevpn.setStatusListener(null)
         Edgevpn.setSocketProtector(null)
         mainHandler.removeCallbacks(statusTicker)
