@@ -58,7 +58,7 @@ The **Unit tests** workflow (`.github/workflows/test.yml`) runs `make test` and 
 
 ## Emulator
 
-A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the preview app without a phone. It uses the emulator and the Android 35 system image from `~/Android/Sdk` (override with `EDGEVPN_EMULATOR_SDK`) and this repo's own adb. The port can be changed with `EDGEVPN_AVD_PORT`.
+A headless x86_64 emulator (AVD `edgevpn`, serial `emulator-5556`) runs the preview app without a phone. It uses the emulator and the Android 35 system image from `~/Android/Sdk` (override with `EDGEVPN_EMULATOR_SDK`) and this repo's own adb. The port can be changed with `EDGEVPN_AVD_PORT`. For an older Android, give the AVD its own name, port and image: `EDGEVPN_AVD=edgevpn-api30 EDGEVPN_AVD_PORT=5558 EDGEVPN_AVD_IMAGE="system-images;android-30;default;x86_64" scripts/emulator setup`, and the same `EDGEVPN_AVD` and `EDGEVPN_AVD_PORT` for `up` and `down`.
 
 | Target | Description |
 |--------|-------------|
