@@ -59,7 +59,11 @@ jobs:
       - name: Cache the build tools
         uses: actions/cache@v5
         with:
-          path: binaries
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+            !binaries/testpeer
           key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       # Signed with the release key so each preview installs over the one
