@@ -3,6 +3,7 @@ package edgevpn
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/mudler/edgevpn/pkg/node"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 )
 
 func TestStaleConns(t *testing.T) {
@@ -450,5 +452,115 @@ func TestNetworkChangeStepsWithoutANetworkLogOneLine(t *testing.T) {
 	}
 	if len(lines) != 1 || !strings.Contains(lines[0], "local network: true") {
 		t.Fatalf("got INFO lines %q, want one saying local network: true", lines)
+	}
+}
+
+// forwardTCP accepts on l and copies each connection to and from addr, after
+// waiting delay. It stops when the test ends.
+func forwardTCP(t *testing.T, l net.Listener, addr string, delay time.Duration) {
+	t.Helper()
+	t.Cleanup(func() { l.Close() })
+	go func() {
+		for {
+			in, err := l.Accept()
+			if err != nil {
+				return
+			}
+			go func() {
+				defer in.Close()
+				time.Sleep(delay)
+				out, err := net.Dial("tcp", addr)
+				if err != nil {
+					return
+				}
+				defer out.Close()
+				go func() { _, _ = io.Copy(out, in) }()
+				_, _ = io.Copy(in, out)
+			}()
+		}
+	}()
+}
+
+// A dial that is already running when redial starts can still be waiting on a
+// relay after its direct address failed, as happens in the first second
+// after Wi-Fi goes away. redial then shares that dial, gets the relayed
+// connection and must still get a direct one once the direct address works.
+func TestRedialReplacesARelayedConnectionWithADirectOne(t *testing.T) {
+	relayHost, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.EnableRelayService(),
+		libp2p.ForceReachabilityPublic(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { relayHost.Close() })
+	target, targetAddr := newLoopbackHost(t)
+	relayInfo := peer.AddrInfo{ID: relayHost.ID(), Addrs: relayHost.Addrs()}
+	if err := target.Connect(context.Background(), relayInfo); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Reserve(context.Background(), target, relayInfo); err != nil {
+		t.Fatalf("reserve a relay slot: %v", err)
+	}
+	relayTCP, err := manet.ToNetAddr(relayHost.Addrs()[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The relay is reached through a slow forwarder, so the relayed dial is
+	// still running when redial starts.
+	slow, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	forwardTCP(t, slow, relayTCP.String(), time.Second)
+	circuit, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d/p2p/%s/p2p-circuit", slow.Addr().(*net.TCPAddr).Port, relayHost.ID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The target's direct address refuses connections until the "new network"
+	// is up, then forwards to the target.
+	reserved, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directPort := reserved.Addr().(*net.TCPAddr).Port
+	reserved.Close()
+	direct, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", directPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, _ := newLoopbackHost(t)
+	targetInfo := peer.AddrInfo{ID: target.ID(), Addrs: []ma.Multiaddr{direct, circuit}}
+	earlier := make(chan error, 1)
+	go func() { earlier <- h.Connect(context.Background(), targetInfo) }()
+
+	time.Sleep(200 * time.Millisecond)
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", directPort))
+	if err != nil {
+		t.Fatal(err)
+	}
+	forwardTCP(t, l, targetAddr, 0)
+
+	dialled, ok := redial(context.Background(), h, []peer.AddrInfo{{ID: target.ID(), Addrs: []ma.Multiaddr{direct}}})
+
+	if err := <-earlier; err != nil {
+		t.Fatalf("the earlier dial failed, so this test proves nothing: %v", err)
+	}
+	if dialled != 1 || ok != 1 {
+		t.Errorf("dialled %d, connected %d; want 1 and 1", dialled, ok)
+	}
+	var kinds []string
+	directConn := false
+	for _, c := range h.Network().ConnsToPeer(target.ID()) {
+		kinds = append(kinds, fmt.Sprintf("%v limited=%t", c.RemoteMultiaddr(), c.Stat().Limited))
+		if !c.Stat().Limited {
+			directConn = true
+		}
+	}
+	if !directConn {
+		t.Errorf("no direct connection to the target after redial; connections: %v", kinds)
 	}
 }
