@@ -1,7 +1,6 @@
 package com.kairos.edgevpn
 
 import androidx.test.core.app.ActivityScenario
-import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
@@ -43,9 +42,10 @@ class SettingsScreenTest {
             // after the title, which opens the help sheet instead of the editor.
             onView(withId(R.id.addressValue)).perform(nestedScrollTo(), click())
             onView(withId(R.id.field)).inRoot(isDialog()).perform(replaceText("10.1.0.256"))
-            closeSoftKeyboard()
-            onView(withText("Save")).perform(click())
+            onView(withId(R.id.field)).inRoot(isDialog()).check(matches(withText("10.1.0.256")))
+            onView(withText("Save")).inRoot(isDialog()).perform(pressButton())
 
+            onView(withText("Save")).inRoot(isDialog()).check(matches(isDisplayed()))
             onView(withText("Use four numbers from 0 to 255, like 10.1.0.2.")).check(matches(isDisplayed()))
             assertEquals("10.1.0.2", AppSettings.address(context))
         }

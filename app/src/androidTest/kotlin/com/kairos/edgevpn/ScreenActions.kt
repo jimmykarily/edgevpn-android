@@ -22,6 +22,27 @@ import org.hamcrest.Matchers.allOf
 import org.junit.Assert.assertEquals
 
 /**
+ * Presses a button through its click listener instead of a tap at screen coordinates. A dialog
+ * moves while the keyboard opens or closes, so on a slow emulator a tap aimed at its button can
+ * land outside the dialog and close it. Use it only where the test is about what the button
+ * does, not about where it is.
+ */
+fun pressButton(): ViewAction = object : ViewAction {
+    override fun getConstraints(): Matcher<View> = allOf(
+        isAssignableFrom(View::class.java),
+        withEffectiveVisibility(Visibility.VISIBLE),
+    )
+
+    override fun getDescription() = "press the button through its click listener"
+
+    override fun perform(uiController: UiController, view: View) {
+        check(view.isEnabled) { "the button is disabled" }
+        view.performClick()
+        uiController.loopMainThreadUntilIdle()
+    }
+}
+
+/**
  * Scrolls a view inside a NestedScrollView into sight, which Espresso's own scrollTo() refuses
  * because it only accepts the platform ScrollView.
  */
