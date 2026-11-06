@@ -48,7 +48,7 @@ make install      # build + push APK to USB-connected device
 | `make app` | Build the Android debug APK |
 | `make preview` | Build the preview APK (`com.kairos.edgevpn.preview`, installs next to a release) |
 | `make release` | Build the release APK (signed only when the signing variables below are set) |
-| `make test` | Run the scrub-key self-test, the Go tests and the app's JVM unit tests |
+| `make test` | Run the self-tests of `scripts/scrub-key` and `scripts/vpn-routes`, the Go tests and the app's JVM unit tests |
 | `make lint` | Run Android lint on the debug build; fails on errors, warnings go to `app/build/reports/` |
 | `make install` | Build + install APK on USB-connected device via adb |
 | `make clean` | Remove build outputs |
