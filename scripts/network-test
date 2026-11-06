@@ -577,9 +577,8 @@ main() {
 
     # The files go straight from the key file into the app's private
     # storage, so the key never appears on a command line. They go through
-    # adb shell's stdin: adb exec-in often ends the command before it has
-    # read its input, on every API level tried, and on Android 8 it never
-    # wrote the file in six tries.
+    # adb shell's stdin, because adb exec-in can end the command before it
+    # has read its input, and then the file stays empty.
     adb_ shell run-as "$PACKAGE" mkdir -p files/network-test
     adb_ shell "run-as $PACKAGE sh -c 'cat > files/network-test/token'" <"$("$TESTPEER" key)"
     echo "$peer" | adb_ shell "run-as $PACKAGE sh -c 'cat > files/network-test/peers'"
