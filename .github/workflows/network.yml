@@ -20,6 +20,8 @@ jobs:
   # off for longer than the VM's 60 second ownership TTL and checks that
   # traffic comes back after turning on again. The network key is a
   # temporary one the VM generates for the run, so the job needs no secret.
+  # make network-test-address-in-use then moves the VM to the app's address
+  # and checks that the app warns about it.
   network:
     name: Network tests
     runs-on: ubuntu-latest
@@ -212,7 +214,9 @@ jobs:
           profile: pixel_6
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: make network-test ANDROID_SERIAL=emulator-5554
+          # The basic check, then the address-in-use check against the same
+          # peer, in one emulator boot.
+          script: make network-test ANDROID_SERIAL=emulator-5554 && make network-test-address-in-use ANDROID_SERIAL=emulator-5554
 
       # The VM's console log, which also covers a VM that never came up and
       # so never reached the test. The script replaces the key in it.
