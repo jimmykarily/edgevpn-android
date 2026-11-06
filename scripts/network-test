@@ -350,6 +350,8 @@ main() {
     [ "$(adb_ shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = 1 ] || fail "$SERIAL is not booted"
 
     trap finish EXIT
+    ANDROID_SERIAL="$SERIAL" EDGEVPN_ADB="$ADB" "$ROOT/scripts/settle-emulator" ||
+        fail "a system popup kept the focus on the emulator"
     if ! "$TESTPEER" status >/dev/null 2>&1; then
         STARTED_PEER=1
         "$TESTPEER" up
