@@ -13,6 +13,11 @@
 # key does not stay on the device.
 #
 # NETWORK_TEST_LONG=0 skips the off/on part for a quick local run.
+# NETWORK_TEST_SWITCH=0 skips the part that switches the emulator's network
+# (Wi-Fi off, Wi-Fi on, airplane mode); NETWORK_TEST_SWITCH_TIMEOUT is the
+# number of seconds each step has to get pings working both ways again.
+# NETWORK_TEST_MDNS_CHECK=1 also requires the app to log a fresh
+# "mdns(android): using interfaces:" line listing wlan0 after Wi-Fi is back.
 
 set -euo pipefail
 
@@ -37,6 +42,9 @@ RECOVER_TIMEOUT="${NETWORK_TEST_RECOVER_TIMEOUT:-300}"
 # interval, so the peer has dropped the app's entry when the VPN comes back.
 OFF_SECONDS="${NETWORK_TEST_OFF_SECONDS:-100}"
 LONG="${NETWORK_TEST_LONG:-1}"
+SWITCH="${NETWORK_TEST_SWITCH:-1}"
+SWITCH_TIMEOUT="${NETWORK_TEST_SWITCH_TIMEOUT:-60}"
+MDNS_CHECK="${NETWORK_TEST_MDNS_CHECK:-0}"
 OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
 
 TESTPEER="$ROOT/scripts/testpeer"
@@ -270,10 +278,54 @@ no_protect_failures() {
     log "no VpnService.protect failures in the app's log so far"
 }
 
+# Number of "mdns(android): using interfaces:" log lines that list wlan0.
+mdns_wlan0_lines() {
+    adb_ logcat -d -b main 2>/dev/null | grep -F 'mdns(android): using interfaces:' | grep -c 'wlan0' || true
+}
+
+# Runs the network change in $2 (a command string run with eval), then
+# measures the seconds until the app and the peer can ping each other, and
+# fails when that takes longer than SWITCH_TIMEOUT. $1 names the step in the
+# log.
+switch_step() {
+    local name="$1" action="$2" start now left
+    log "switch $name: starting"
+    start=$(date +%s)
+    eval "$action"
+    ping_until app "$PEER_ADDRESS" "$SWITCH_TIMEOUT" || fail "switch $name: the app cannot ping the peer within ${SWITCH_TIMEOUT}s"
+    now=$(date +%s)
+    left=$((SWITCH_TIMEOUT - (now - start)))
+    [ "$left" -ge 1 ] || left=1
+    ping_until peer "$APP_ADDRESS" "$left" || fail "switch $name: the peer cannot ping the app within ${SWITCH_TIMEOUT}s"
+    log "switch $name: $(($(date +%s) - start))s"
+}
+
+# Waits up to 30 seconds until wlan0 has (state "up") or has lost (state
+# "down") its IPv4 address, so a ping right after svc wifi does not pass on
+# the old network.
+wait_wlan0() {
+    local want="$1" i
+    for i in $(seq 30); do
+        if adb_ shell ip -4 -o addr show wlan0 2>/dev/null | grep -q ' inet '; then
+            [ "$want" = up ] && return 0
+        else
+            [ "$want" = down ] && return 0
+        fi
+        sleep 1
+    done
+}
+
+# Puts Wi-Fi on and airplane mode off, whatever state a step left them in.
+restore_network() {
+    adb_ shell cmd connectivity airplane-mode disable >/dev/null 2>&1
+    adb_ shell svc wifi enable >/dev/null 2>&1
+}
+
 finish() {
     local status=$?
     trap - EXIT
     set +e
+    restore_network
     collect_logs
     adb_ shell am force-stop "$PACKAGE" >/dev/null 2>&1
     # Removes the stored key and settings from the device.
@@ -414,6 +466,23 @@ main() {
     peer_has_app || fail "the peer does not list $APP_ADDRESS while connected"
     log "the peer lists $APP_ADDRESS"
     screens
+
+    if [ "$SWITCH" != 0 ]; then
+        local mdns_before
+        switch_step wifi-off 'adb_ shell svc wifi disable; wait_wlan0 down'
+        mdns_before=$(mdns_wlan0_lines)
+        switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up'
+        if [ "$MDNS_CHECK" != 0 ]; then
+            local waited=0
+            until [ "$(mdns_wlan0_lines)" -gt "$mdns_before" ]; do
+                [ "$waited" -lt "$SWITCH_TIMEOUT" ] || fail "no fresh mdns(android) line listing wlan0 within ${SWITCH_TIMEOUT}s of Wi-Fi coming back"
+                sleep 2
+                waited=$((waited + 2))
+            done
+            log "the app restarted mDNS on wlan0 after Wi-Fi came back"
+        fi
+        switch_step airplane 'adb_ shell cmd connectivity airplane-mode enable; sleep 10; adb_ shell cmd connectivity airplane-mode disable'
+    fi
 
     if [ "$LONG" != 0 ]; then
         tap "Turn off"
