@@ -91,7 +91,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: android-avd-35-default-x86_64-disk2g-pixel6
+          key: android-avd-35-default-x86_64-disk2g-pixel6-clean
 
       # The Debian cloud image and the edgevpn binary built for the VM. The
       # script names both by version, and the key changes with the script
@@ -181,7 +181,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: android-avd-35-default-x86_64-disk2g-pixel6
+          key: android-avd-35-default-x86_64-disk2g-pixel6-clean
 
       # The runner's emulator is emulator-5554.
       - name: Run the network test

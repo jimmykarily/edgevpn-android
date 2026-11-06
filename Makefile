@@ -221,6 +221,11 @@ e2e-run: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	for s in window_animation_scale transition_animation_scale animator_duration_scale; do \
 	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) shell settings put global $$s 0 || exit 1; \
 	done
+	# A device that ran tests before may still have the app, signed with
+	# another machine's debug key; Android then refuses to install over it.
+	for p in com.kairos.edgevpn.test com.kairos.edgevpn; do \
+	  $(ANDROID_HOME)/platform-tools/adb -s $(ANDROID_SERIAL) uninstall $$p >/dev/null 2>&1 || true; \
+	done
 	ANDROID_SERIAL=$(ANDROID_SERIAL) $(GRADLE) -p $(CURDIR) connectedDebugAndroidTest
 
 # ── Test peer ────────────────────────────────────────────────────

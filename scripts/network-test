@@ -299,6 +299,38 @@ screens() {
     wait_for "Turn off" 10 >/dev/null || fail "the main screen did not come back"
 }
 
+# True when the emulator has an IPv4 address on its virtual Wi-Fi or
+# Ethernet and a default route through the emulator's gateway (10.0.2.2),
+# which is also where the test peer's port is forwarded.
+network_ready() {
+    adb_ shell ip -4 -o addr show 2>/dev/null | grep -qE ' (wlan0|eth0) +inet ' &&
+        adb_ shell ip route show table all 2>/dev/null | grep -q '^default via 10\.0\.2\.2 '
+}
+
+# A CI emulator once booted with no network at all, and the test then spent
+# five minutes failing to connect. Waiting here makes that fail early and
+# with the cause. Turning Wi-Fi off and on once is a cheap attempt to bring
+# the network back first; whether it helps in that case is unknown.
+wait_for_network() {
+    local waited=0
+    while ! network_ready; do
+        if [ "$waited" -eq 60 ]; then
+            log "the emulator has no network after 60s; turning Wi-Fi off and on"
+            adb_ shell svc wifi disable || true
+            sleep 2
+            adb_ shell svc wifi enable || true
+        fi
+        if [ "$waited" -ge 120 ]; then
+            adb_ shell ip -4 -o addr show >"$OUT/ip-addr.txt" 2>&1 || true
+            adb_ shell ip route show table all >"$OUT/ip-route.txt" 2>&1 || true
+            fail "the emulator has no network (no address on wlan0 or eth0, or no default route via 10.0.2.2) after ${waited}s; see ip-addr.txt and ip-route.txt"
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    log "emulator network ready"
+}
+
 main() {
     rm -rf "$OUT"
     mkdir -p "$OUT"
@@ -313,7 +345,12 @@ main() {
     local peer
     peer=$("$TESTPEER" addr)
     log "peer at $peer"
+    wait_for_network
 
+    # A device that ran tests before may still have the app, signed with
+    # another machine's debug key; Android then refuses to install over it.
+    adb_ uninstall "$PACKAGE.test" >/dev/null 2>&1 || true
+    adb_ uninstall "$PACKAGE" >/dev/null 2>&1 || true
     adb_ install -r "$APK" >/dev/null
     adb_ install -r "$TEST_APK" >/dev/null
     adb_ shell am force-stop "$PACKAGE"
