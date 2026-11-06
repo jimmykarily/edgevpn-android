@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/mudler/edgevpn/pkg/node"
 	"github.com/mudler/edgevpn/pkg/protocol"
 	"github.com/mudler/edgevpn/pkg/types"
@@ -279,8 +280,10 @@ func redialTargets(selfID peer.ID, bootstrap []string, machinePeerIDs []string) 
 }
 
 // redial dials every target that is not connected, in parallel, each with
-// its own timeout and past the dial backoff, and waits for all of them. It
-// returns how many it dialled and how many connected.
+// its own timeout, and waits for all of them. It clears each target's dial
+// backoff first, because failures on the old network would otherwise block
+// the dial; relay addresses stay in play, since on mobile data a relay may be
+// the only path. It returns how many it dialled and how many connected.
 func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled, connected int) {
 	var wg sync.WaitGroup
 	var countMu sync.Mutex
@@ -292,7 +295,10 @@ func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled,
 		wg.Add(1)
 		go func(t peer.AddrInfo) {
 			defer wg.Done()
-			dctx, cancel := context.WithTimeout(network.WithForceDirectDial(ctx, "network changed"), redialTimeout)
+			if sw, ok := h.Network().(*swarm.Swarm); ok {
+				sw.Backoff().Clear(t.ID)
+			}
+			dctx, cancel := context.WithTimeout(ctx, redialTimeout)
 			defer cancel()
 			if h.Connect(dctx, t) == nil {
 				countMu.Lock()

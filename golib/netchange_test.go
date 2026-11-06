@@ -10,11 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
+	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	"github.com/mudler/edgevpn/pkg/node"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -235,6 +237,49 @@ func TestRedialPassesTheBackoffAndSkipsConnectedPeers(t *testing.T) {
 	}
 	if h.Network().Connectedness(backedOff.ID()) != network.Connected {
 		t.Error("the backed-off peer is not connected after redial")
+	}
+	for _, a := range backedOff.Addrs() {
+		if sw.Backoff().Backoff(backedOff.ID(), a) {
+			t.Errorf("redial left the backoff on %v", a)
+		}
+	}
+}
+
+func TestRedialKeepsRelayAddresses(t *testing.T) {
+	relayHost, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.EnableRelayService(),
+		libp2p.ForceReachabilityPublic(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { relayHost.Close() })
+	target, _ := newLoopbackHost(t)
+	relayInfo := peer.AddrInfo{ID: relayHost.ID(), Addrs: relayHost.Addrs()}
+	if err := target.Connect(context.Background(), relayInfo); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Reserve(context.Background(), target, relayInfo); err != nil {
+		t.Fatalf("reserve a relay slot: %v", err)
+	}
+	circuit, err := ma.NewMultiaddr(fmt.Sprintf("%s/p2p/%s/p2p-circuit", relayHost.Addrs()[0], relayHost.ID()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, _ := newLoopbackHost(t)
+	sw := h.Network().(*swarm.Swarm)
+	sw.Backoff().AddBackoff(target.ID(), circuit)
+
+	dialled, ok := redial(context.Background(), h, []peer.AddrInfo{{ID: target.ID(), Addrs: []ma.Multiaddr{circuit}}})
+
+	if dialled != 1 || ok != 1 {
+		t.Fatalf("dialled %d, connected %d over the relay; want 1 and 1", dialled, ok)
+	}
+	conns := h.Network().ConnsToPeer(target.ID())
+	if len(conns) == 0 || !conns[0].Stat().Limited {
+		t.Errorf("want a relayed connection to the target, got %v", conns)
 	}
 }
 
