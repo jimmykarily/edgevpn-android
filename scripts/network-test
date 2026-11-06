@@ -315,12 +315,14 @@ switch_step() {
     [ "$now" -le "$SWITCH_TIMEOUT" ] || fail "switch $name: ${now}s is above ${SWITCH_TIMEOUT}s"
 }
 
-# Waits up to 30 seconds until wlan0 has (state "up") or has lost (state
-# "down") its IPv4 address, so a ping right after svc wifi does not pass on
-# the old network.
+# Waits until wlan0 has (state "up") or has lost (state "down") its IPv4
+# address, so a ping right after svc wifi does not pass on the old network.
+# Gives up after $2 seconds (default 30) and returns 1. A CI emulator can
+# take well over 30 seconds to join Wi-Fi again, so the steps that wait for
+# Wi-Fi to come back allow 120 and start their clock once it is up.
 wait_wlan0() {
-    local want="$1" i
-    for i in $(seq 30); do
+    local want="$1" deadline=$(($(date +%s) + ${2:-30}))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
         if adb_ shell ip -4 -o addr show wlan0 2>/dev/null | grep -q ' inet '; then
             [ "$want" = up ] && return 0
         else
@@ -555,7 +557,7 @@ main() {
             log "the app kept mDNS off on mobile data"
         fi
         mdns_before=$(mdns_wlan0_lines)
-        switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up || fail "wlan0 did not come up"'
+        switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up 120 || fail "wlan0 did not come up within 120s"; log "wlan0 is up after $(($(date +%s) - start))s"; start=$(date +%s)'
         if [ "$MDNS_CHECK" != 0 ]; then
             local waited=0
             until [ "$(mdns_wlan0_lines)" -gt "$mdns_before" ]; do
@@ -571,7 +573,9 @@ main() {
             sleep 10
             start=$(date +%s)
             airplane_mode disable
-            wait_wlan0 up || fail "wlan0 did not come back after airplane mode"'
+            wait_wlan0 up 120 || fail "wlan0 did not come back within 120s of airplane mode off"
+            log "wlan0 is up after $(($(date +%s) - start))s"
+            start=$(date +%s)'
     fi
 
     if [ "$LONG" != 0 ]; then
