@@ -398,6 +398,17 @@ restore_network() {
     adb_ shell svc wifi enable >/dev/null 2>&1
 }
 
+# The basic scenario has one device per address, so the warning that
+# another device uses the app's address must never be on screen. A rejected
+# deletion of the app's old entry after off and on once showed it.
+no_address_warning() {
+    if on_screen "Another device already uses $APP_ADDRESS. Pick another address in Settings."; then
+        shot address-warning
+        fail "the app warns that another device uses $APP_ADDRESS, but only the peer at $PEER_ADDRESS is in the network"
+    fi
+    log "no address warning on screen"
+}
+
 finish() {
     local status=$?
     trap - EXIT
@@ -611,6 +622,7 @@ main() {
     [ "$sockets" -gt 0 ] || fail "the app has no listening sockets"
     peer_has_app || fail "the peer does not list $APP_ADDRESS while connected"
     log "the peer lists $APP_ADDRESS"
+    no_address_warning
     screens
 
     if [ "$SWITCH" != 0 ]; then
@@ -667,6 +679,7 @@ main() {
         after=$(listen_sockets) || fail "could not find the app's uid"
         log "app LISTEN sockets after off and on: $after (before: $sockets)"
         [ "$after" -eq "$sockets" ] || fail "the app has $after listening sockets after off and on, want $sockets as before"
+        no_address_warning
     fi
 
     no_protect_failures
