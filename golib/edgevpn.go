@@ -43,6 +43,8 @@ var (
 	mu       sync.Mutex
 	cancelFn context.CancelFunc
 	tunFile  *os.File
+	// currentMDNS runs mDNS for the current session; nil when the VPN is off.
+	currentMDNS *mdnsRunner
 )
 
 // GenerateNodeKey returns a new Ed25519 private key in libp2p's marshaled
@@ -83,8 +85,10 @@ func networkConfig(token, address string) config.Config {
 		LogLevel:       logLevel,
 		Libp2pLogLevel: libp2pLogLevel,
 		Discovery: config.Discovery{
-			DHT:            true,
-			MDNS:           true, // mDNS needed for LAN bootstrap; zeroconf multicast works on Android
+			DHT: true,
+			// The app runs mDNS itself (mdns.go), so that it can restart it
+			// on a network change and keep it off on mobile data.
+			MDNS:           false,
 			BootstrapPeers: bootstrapPeers(),
 		},
 		// Match the CLI defaults (cmd/util.go: autorelay=true, holepunch=true).
@@ -172,7 +176,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	// The Alive options must come before the VPN service options: the VPN
 	// service blocks in its packet loop, so services after it never start.
 	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
-	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService))
+	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService))
 
 	// Inject a protected TCP transport so every socket fd is passed through
 	// VpnService.protect() before connect/bind. This prevents the VPN's own
@@ -209,6 +213,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 			// blocked by SELinux. Mobile devices sit behind carrier/router NAT
 			// anyway and can't map ports, so this is a no-op in practice.
 			libp2p.NATManager(nil),
+			muxerOption(),
 			// On Android, Go's net.InterfaceAddrs() fails because it uses
 			// syscall.NetlinkRIB which calls bind() on a netlink_route_socket
 			// -- blocked by SELinux for untrusted apps. libp2p's address
@@ -251,7 +256,9 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancelFn = cancel
+	sessionCtx = ctx
 	currentNode = n
+	currentMDNS = newMDNSRunner(mdnsTag(normalizeToken(token)))
 	hostReady = false
 	startedAt = time.Now()
 
@@ -279,16 +286,24 @@ func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
 	closeNodeHost(n)
 	mu.Lock()
 	current := currentNode == n
+	var runner *mdnsRunner
 	if current {
+		runner = currentMDNS
+		currentMDNS = nil
 		if tunFile != nil {
 			closeTunOnError("node failure")
 		}
 		currentNode = nil
 		cancelFn = nil
+		sessionCtx = nil
+		netChangeNode = nil
 		hostReady = false
 		fail(reasonStopped, fmt.Sprintf("node.Start returned error: %v", err))
 	}
 	mu.Unlock()
+	if runner != nil {
+		runner.stop()
+	}
 	if current {
 		notifyStopped(err.Error())
 	}
@@ -326,6 +341,11 @@ func Stop() {
 	failureDetail = ""
 	failedAt = time.Time{}
 	currentNode = nil
+	sessionCtx = nil
+	netChangeNode = nil
+	debouncer := netChange
+	runner := currentMDNS
+	currentMDNS = nil
 	startedAt = time.Time{}
 	hostReady = false
 	selfAddress = ""
@@ -337,6 +357,10 @@ func Stop() {
 		tunFile = nil
 	}
 	mu.Unlock()
+	debouncer.stop()
+	if runner != nil {
+		runner.stop()
+	}
 	if hostToClose != nil {
 		go closeHost(hostOf(hostToClose))
 	}

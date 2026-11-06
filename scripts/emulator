@@ -24,7 +24,11 @@ AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
 AVD_NAME="${EDGEVPN_AVD:-edgevpn}"
-IMAGE="system-images;android-35;default;x86_64"
+# EDGEVPN_AVD_IMAGE picks another system image, for an AVD of an older
+# Android under its own EDGEVPN_AVD name.
+IMAGE="${EDGEVPN_AVD_IMAGE:-system-images;android-35;default;x86_64}"
+# The image's directory in the SDK: the package path with ";" as "/".
+IMAGE_DIR="$ANDROID_HOME/${IMAGE//;//}"
 PORT="${EDGEVPN_AVD_PORT:-5556}"
 SERIAL="emulator-$PORT"
 
@@ -82,7 +86,7 @@ $(tail -20 "$LOG_FILE" 2>/dev/null)"
 cmd_setup() {
     # The SDK is shared with other projects' emulators, so it is left alone
     # when it already has what this one needs.
-    if [ ! -x "$EMULATOR" ] || [ ! -d "$ANDROID_HOME/system-images/android-35/default/x86_64" ]; then
+    if [ ! -x "$EMULATOR" ] || [ ! -d "$IMAGE_DIR" ]; then
         [ -x "$SDKMANAGER" ] || die "no sdkmanager at $SDKMANAGER"
         yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
         "$SDKMANAGER" --install "emulator" "$IMAGE"

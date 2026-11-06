@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Prints the routes of the app's VPN network from dumpsys connectivity.
+
+usage: vpn-routes <dumpsys-file> <package> <vpn-address>
+       vpn-routes --self-test
+
+One route per line, as dumpsys writes it, e.g. "10.1.0.0/24 -> 0.0.0.0 tun0
+mtu 0". Prints nothing when no network in the file is the app's VPN.
+
+Android 12 and later name the VPN's package ("extra: VPN:<package>"). Before
+that the network is only "type: VPN[]", so the app's VPN is the one whose
+link addresses hold the app's VPN address.
+"""
+
+import re
+import sys
+
+
+def vpn_routes(lines, package, address):
+    """The routes of the first NetworkAgentInfo line that is the app's VPN."""
+    for line in lines:
+        if "NetworkAgentInfo" not in line:
+            continue
+        named = re.search(r"extra: VPN:" + re.escape(package) + r"(\}|\s)", line)
+        unnamed = "type: VPN[" in line and re.search(
+            r"LinkAddresses: \[(?:[^\]]*[\s,])?" + re.escape(address) + "/", line
+        )
+        if not (named or unnamed):
+            continue
+        m = re.search(r"Routes: \[([^\]]*)\]", line)
+        if m:
+            # Android 8 ends the list with a comma.
+            return [r.strip() for r in m.group(1).split(",") if r.strip()]
+    return []
+
+
+API35 = (
+    "  NetworkAgentInfo{network{147}  handle{634765889549}  ni{VPN CONNECTED extra: VPN:com.kairos.edgevpn}"
+    " created=2026-11-06T11:36:36.888Z  underlying{[145]}  lp{{InterfaceName: tun0 LinkAddresses: [ 10.1.0.4/24 ]"
+    " DnsAddresses: [ ] Domains:  MTU: 1500 Routes: [ 10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0 ]}}"
+    "  nc{[ Transports: WIFI|VPN Capabilities: INTERNET&NOT_RESTRICTED OwnerUid: 10202 UnderlyingNetworks: [145]]}"
+)
+API35_OTHER_APP = API35.replace("VPN:com.kairos.edgevpn", "VPN:com.example.othervpn")
+API30 = (
+    "  NetworkAgentInfo{ ni{[type: VPN[], state: CONNECTED/CONNECTED, reason: agentConnect, extra: (none),"
+    " failover: false, available: true, roaming: false]}  network{102}  nethandle{441492361229}"
+    "  lp{{InterfaceName: tun0 LinkAddresses: [ 10.1.0.4/24 ] DnsAddresses: [ ] Domains:  MTU: 1500"
+    " Routes: [ 10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0 ]}}  nc{[ Transports: WIFI|VPN OwnerUid: 10130]}  Score{101}"
+)
+API26 = (
+    "  NetworkAgentInfo{ ni{[type: VPN[], state: CONNECTED/CONNECTED, reason: agentConnect, extra: (none),"
+    " failover: false, available: true, roaming: false, metered: false]}  network{104}  nethandle{446693034718}"
+    "  lp{{InterfaceName: tun0 LinkAddresses: [10.1.0.4/24,]  Routes: [10.1.0.0/24 -> 0.0.0.0 tun0,]"
+    " DnsAddresses: [] Domains:  MTU: 0}}  nc{[ Transports: VPN Capabilities: NOT_RESTRICTED&TRUSTED]}  Score{0}"
+)
+API26_UNREACHABLE = API26.replace(
+    "Routes: [10.1.0.0/24 -> 0.0.0.0 tun0,]", "Routes: [10.1.0.0/24 -> 0.0.0.0 tun0,::/0 -> :: tun0 unreachable,]"
+)
+API26_OTHER_ADDRESS = API26.replace("10.1.0.4/24", "10.9.0.4/24")
+WIFI26 = (
+    "  NetworkAgentInfo{ ni{[type: WIFI[], state: CONNECTED/CONNECTED, extra: \"AndroidWifi\"]}  network{103}"
+    "  lp{{InterfaceName: wlan0 LinkAddresses: [192.168.232.2/21,]  Routes: [0.0.0.0/0 -> 192.168.232.1 wlan0,]}}"
+)
+
+
+def self_test():
+    pkg, addr = "com.kairos.edgevpn", "10.1.0.4"
+    cases = [
+        ("Android 15 names the package", [API35], ["10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0"]),
+        ("Android 15, another app's VPN", [API35_OTHER_APP], []),
+        ("Android 11 by the VPN address", [API30], ["10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0"]),
+        ("Android 8 by the VPN address", [WIFI26, API26], ["10.1.0.0/24 -> 0.0.0.0 tun0"]),
+        ("Android 8, two routes", [API26_UNREACHABLE], ["10.1.0.0/24 -> 0.0.0.0 tun0", "::/0 -> :: tun0 unreachable"]),
+        ("Android 8, a VPN with another address", [API26_OTHER_ADDRESS], []),
+        ("Android 8, no VPN", [WIFI26], []),
+    ]
+    failed = 0
+    for name, lines, want in cases:
+        got = vpn_routes(lines, pkg, addr)
+        if got != want:
+            failed += 1
+            print(f"FAIL {name}: got {got!r}, want {want!r}")
+        else:
+            print(f"ok   {name}")
+    return 1 if failed else 0
+
+
+def main(argv):
+    if argv[1:] == ["--self-test"]:
+        return self_test()
+    if len(argv) != 4:
+        print(__doc__.strip().splitlines()[2], file=sys.stderr)
+        return 2
+    with open(argv[1], errors="replace") as f:
+        routes = vpn_routes(f, argv[2], argv[3])
+    if routes:
+        print("\n".join(routes))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
