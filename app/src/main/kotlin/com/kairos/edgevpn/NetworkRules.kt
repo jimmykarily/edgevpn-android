@@ -27,6 +27,11 @@ fun pickNetwork(networks: Collection<NetworkInfo>): NetworkInfo? =
 /** True on a network that can have other devices on the same link, where mDNS makes sense. */
 fun isLocalNetwork(n: NetworkInfo?): Boolean = n != null && (n.wifi || n.ethernet)
 
+/** True while any non-VPN Wi-Fi or Ethernet network is connected, with or without internet
+ * access. A Wi-Fi with only a LAN is still where mDNS finds peers, even when Android sends
+ * the traffic over validated cellular. */
+fun onLocalNetwork(connected: Collection<NetworkInfo>): Boolean = connected.any { isLocalNetwork(it) }
+
 fun networkLabel(n: NetworkInfo?): String = when {
     n == null -> "none"
     n.wifi -> "wifi"

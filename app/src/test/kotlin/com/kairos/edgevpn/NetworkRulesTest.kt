@@ -88,4 +88,24 @@ class NetworkRulesTest {
         assertEquals("cellular", networkLabel(cellular(1)))
         assertEquals("none", networkLabel(null))
     }
+
+    @Test
+    fun wifiWithoutInternetNextToValidatedCellularIsLocal() {
+        assertTrue(onLocalNetwork(listOf(cellular(1), wifi(2, validated = false))))
+    }
+
+    @Test
+    fun ethernetWithoutInternetIsLocal() {
+        assertTrue(onLocalNetwork(listOf(ethernet(3, validated = false))))
+    }
+
+    @Test
+    fun onlyCellularIsNotLocal() {
+        assertFalse(onLocalNetwork(listOf(cellular(1))))
+    }
+
+    @Test
+    fun noNetworkIsNotLocal() {
+        assertFalse(onLocalNetwork(emptyList()))
+    }
 }

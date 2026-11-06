@@ -32,21 +32,23 @@ After the phone switches between Wi-Fi and mobile data, VPN traffic works again 
 
 ### Kotlin: watch the network
 
-A new class `UnderlyingNetworkWatcher` in the service owns one network callback for the session. It is registered in `connect()` after `Edgevpn.start` succeeds and unregistered in `teardown()`.
+A new class `UnderlyingNetworkWatcher` in the service owns two network callbacks for the session: one for the best network, one for the local flag. Both are registered in `connect()` after `Edgevpn.start` succeeds and unregistered in `teardown()`.
 
 Which network to watch: an app's default network, as reported by `registerDefaultNetworkCallback`, is the VPN itself when the VPN applies to the app, and it does apply to this app. So the watcher asks for the best network that is not a VPN:
 
 - Android 12 (API 31) and later: `registerBestMatchingNetworkCallback` with a request for `NET_CAPABILITY_INTERNET` and `NET_CAPABILITY_NOT_VPN`. Android does the ranking.
 - Android 8 to 11 (API 26 to 30): `registerNetworkCallback` with the same request, keeping the capabilities of every network it reports. A pure function picks the current one: validated before not validated, then Wi-Fi, then Ethernet, then cellular. This path is untested on a real device; the emulator image in CI is API 35.
 
-When the chosen network changes (another `Network`, or the same network switching between Wi-Fi and something else), the watcher:
+The local flag comes from the second callback: `registerNetworkCallback` with a request for `NET_CAPABILITY_NOT_VPN` and the transports Wi-Fi or Ethernet, with `NET_CAPABILITY_INTERNET` removed. `onLocalNetwork` is true while any network it reports is connected, whatever its internet or validation state. The best network alone would be the wrong source: on a Wi-Fi with only a LAN, Android ranks validated cellular first, and mDNS would stop although its peers are on that Wi-Fi. A pure function, `onLocalNetwork`, makes the decision and has unit tests. The flag is false on mobile data alone and when no network is left.
 
-1. calls `setUnderlyingNetworks(arrayOf(network))`, or `setUnderlyingNetworks(null)` when no network is left. The VPN carries only 10.1.0.0/24, so this does not change routing; it makes Android report the right transport and metered state for the VPN to other apps and in Settings.
-2. calls `Edgevpn.networkChanged(onLocalNetwork)`, where `onLocalNetwork` is true when the network is Wi-Fi or Ethernet. It is false on mobile data and when no network is left.
+When the best network or the local flag changes, the watcher:
+
+1. calls `setUnderlyingNetworks(arrayOf(network))` with the best network, or `setUnderlyingNetworks(null)` when no network with internet is left. The VPN carries only 10.1.0.0/24, so this does not change routing; it makes Android report the right transport and metered state for the VPN to other apps and in Settings.
+2. calls `Edgevpn.networkChanged(onLocalNetwork)`.
 
 The first report after registering also goes through both steps, so Go learns the starting network type.
 
-The multicast lock stays as it is: taken at start, released at teardown. A lock taken through `WifiManager` is expected to survive Wi-Fi going away and coming back (untested). The emulator test checks that mDNS finds the peer again after Wi-Fi returns; if it does not, the watcher also releases and takes the lock again on each change, and the design gets updated.
+The multicast lock stays as it is: taken at start, released at teardown. A lock taken through `WifiManager` is expected to survive Wi-Fi going away and coming back, but that is untested. The emulator test checks only that mDNS starts again on `wlan0` after Wi-Fi returns. It cannot check that mDNS finds the peer, because the test peer sits behind the emulator's NAT and no multicast reaches it. If a phone shows that mDNS finds nothing after Wi-Fi returns, the watcher should also release and take the lock again on each change.
 
 ### Go: `NetworkChanged(onLocalNetwork bool)`
 
@@ -97,7 +99,7 @@ Emulator test, a new part of `scripts/network-test` (and so of `make network-tes
 
 1. Connect as today and wait until pings work both ways.
 2. Run a ping from the peer to the app in the background, then `svc wifi disable`. Measure the time until pings work both ways again over mobile data.
-3. `svc wifi enable`. Measure again, and check in the log that mDNS started again on `wlan0`.
+3. `svc wifi enable`. Measure again, and check in the log that mDNS started again on `wlan0`. Before this step, check that no fresh mDNS start was logged while only mobile data was left.
 4. Airplane mode on (`cmd connectivity airplane-mode enable`) for 10 seconds, then off. Measure again.
 
 Each step fails above 60 seconds and logs the measured time. 60 seconds is looser than the 10 second goal because CI emulators are slow and the bound must not flake; the measured times on a local run go into the pull request. Before the fix, the same steps run once on `main` to record the baseline, which is the RED for this test.
