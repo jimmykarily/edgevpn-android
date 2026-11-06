@@ -213,6 +213,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 			// blocked by SELinux. Mobile devices sit behind carrier/router NAT
 			// anyway and can't map ports, so this is a no-op in practice.
 			libp2p.NATManager(nil),
+			muxerOption(),
 			// On Android, Go's net.InterfaceAddrs() fails because it uses
 			// syscall.NetlinkRIB which calls bind() on a netlink_route_socket
 			// -- blocked by SELinux for untrusted apps. libp2p's address
