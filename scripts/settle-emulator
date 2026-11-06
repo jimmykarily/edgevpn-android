@@ -38,23 +38,30 @@ popup() {
     esac
 }
 
-# Taps the button of the popup on screen that lets things carry on: "Wait"
-# for a popup about an app that is not responding, "Close app" for one about
-# an app that stopped.
+# Taps the button of the popup on screen that lets things carry on. For the
+# system process, which cannot be closed without restarting the device, that
+# is "Wait". For any other app it is "Close app": a launcher stuck on a slow
+# CI runner can stay "not responding" for minutes while only "Wait" is
+# tapped, and the tests start the app's own screen, so closing it costs
+# nothing.
+# "OK" is for a popup about an app that stopped.
 answer_popup() {
-    local xml xy
+    local xml xy labels="close app,wait,ok"
+    case "$1" in
+        *": system}"*) labels="wait,close app,ok" ;;
+    esac
     xml=$(adb_ exec-out uiautomator dump /dev/tty 2>/dev/null) || return 0
     xy=$(printf '%s' "$xml" | python3 -I -c '
 import re, sys
 xml = sys.stdin.read()
 nodes = [dict(re.findall(r"([\w-]+)=\"([^\"]*)\"", n)) for n in re.findall(r"<node [^>]*>", xml)]
-for label in ("wait", "close app", "ok"):
+for label in sys.argv[1].split(","):
     for n in nodes:
         if n.get("text", "").strip().lower() == label and n.get("clickable") == "true":
             x1, y1, x2, y2 = map(int, re.findall(r"\d+", n["bounds"]))
             print((x1 + x2) // 2, (y1 + y2) // 2)
             sys.exit(0)
-')
+' "$labels")
     if [ -n "$xy" ]; then
         # shellcheck disable=SC2086
         adb_ shell input tap $xy
@@ -75,7 +82,7 @@ while [ "$stable" -lt "$STABLE_SECONDS" ]; do
     current=$(focus)
     if [ -z "$current" ] || [ "$current" = null ] || popup "$current"; then
         popup "$current" && echo "settle-emulator: answering $current"
-        answer_popup
+        answer_popup "$current"
         adb_ shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
         stable=0
     else
