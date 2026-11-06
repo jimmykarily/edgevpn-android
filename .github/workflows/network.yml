@@ -56,10 +56,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
 
+      # Every cache below is restored here and saved by its own step as soon
+      # as its contents are ready, so a failed test still leaves them for the
+      # next run. A pull request can only read caches saved by its own runs
+      # or by main, so a cache lost on main means a slow first run on every
+      # new pull request. The E2E tests job explains the same layout.
+
       # The same tools as the E2E tests job. The test peer's files are
       # cached below under a key of their own.
-      - name: Cache the build tools
-        uses: actions/cache@v5
+      - name: Restore the build tools
+        id: tools-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             binaries
@@ -68,17 +75,18 @@ jobs:
             !binaries/testpeer
           key: network-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
-      - name: Cache the emulator and system image
-        uses: actions/cache@v5
+      - name: Restore the emulator and system image
+        id: emulator-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             binaries/android-sdk/emulator
             binaries/android-sdk/system-images/android-35/default/x86_64
           key: android-sdk-emulator-35-default-x86_64
 
-      - name: Cache the device and its snapshot
-        uses: actions/cache@v5
+      - name: Restore the device and its snapshot
         id: avd-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.android/avd/*
@@ -88,8 +96,9 @@ jobs:
       # The Debian cloud image and the edgevpn binary built for the VM. The
       # script names both by version, and the key changes with the script
       # (which pins the image) and with go.mod (which pins edgevpn).
-      - name: Cache the test peer's image and edgevpn
-        uses: actions/cache@v5
+      - name: Restore the test peer's image and edgevpn
+        id: testpeer-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             binaries/testpeer/*.qcow2
@@ -98,6 +107,32 @@ jobs:
 
       - name: Build the app and the tests
         run: make e2e-build
+
+      - name: Save the build tools
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+            !binaries/testpeer
+          key: network-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      # Installed here rather than left to the emulator runner; see the E2E
+      # tests job.
+      - name: Install the emulator and system image, only when not cached
+        if: steps.emulator-cache.outputs.cache-hit != 'true'
+        run: scripts/ci-install-emulator
+
+      - name: Save the emulator and system image
+        if: steps.emulator-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            binaries/android-sdk/emulator
+            binaries/android-sdk/system-images/android-35/default/x86_64
+          key: android-sdk-emulator-35-default-x86_64
 
       # The emulator and the VM both need hardware acceleration, and the
       # runner ships /dev/kvm owned by a group the job's user is not in.
@@ -112,6 +147,15 @@ jobs:
       # early and on its own.
       - name: Start the test peer
         run: make peer-up
+
+      - name: Save the test peer's image and edgevpn
+        if: steps.testpeer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            binaries/testpeer/*.qcow2
+            binaries/testpeer/edgevpn-*
+          key: testpeer-${{ hashFiles('scripts/testpeer', 'golib/go.mod') }}
 
       - name: Create the device, only when it is not cached
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -129,6 +173,15 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Device created and snapshotted for the cache."
+
+      - name: Save the device and its snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: android-avd-35-default-x86_64-disk2g-pixel6
 
       # The runner's emulator is emulator-5554.
       - name: Run the network test

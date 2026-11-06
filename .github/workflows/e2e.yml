@@ -55,12 +55,20 @@ jobs:
           go-version-file: golib/go.mod
           cache-dependency-path: golib/go.sum
 
+      # Every cache below is restored here and saved by its own step as soon
+      # as its contents are ready, instead of at the end of the job. A cache
+      # saved at the end is lost when the tests fail, and a pull request can
+      # only read caches saved by its own runs or by main. With end-of-job
+      # saving, one failed run on main left every new pull request to
+      # download and build everything again.
+
       # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
       # downloads into binaries/, cached like in the preview job. The emulator
       # and its system image live in the same SDK but are left out here,
       # because the next cache holds them under a key of their own.
-      - name: Cache the build tools
-        uses: actions/cache@v5
+      - name: Restore the build tools
+        id: tools-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             binaries
@@ -72,8 +80,9 @@ jobs:
       # same bytes on every run. The key names the exact image, so a change
       # of API level or architecture fetches once and then caches again under
       # its own key instead of silently reusing the wrong one.
-      - name: Cache the emulator and system image
-        uses: actions/cache@v5
+      - name: Restore the emulator and system image
+        id: emulator-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             binaries/android-sdk/emulator
@@ -83,9 +92,9 @@ jobs:
       # The device itself, and the snapshot it boots from. Creating it and
       # waiting for a first cold boot takes a couple of minutes; restoring
       # this makes later runs start in seconds.
-      - name: Cache the device and its snapshot
-        uses: actions/cache@v5
+      - name: Restore the device and its snapshot
         id: avd-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.android/avd/*
@@ -97,6 +106,32 @@ jobs:
       # also installs the SDK that the emulator runner below needs.
       - name: Build the app and the tests
         run: make e2e-build
+
+      - name: Save the build tools
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+          key: e2e-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+
+      # Installed here rather than left to the emulator runner, which reports
+      # a broken download only as a warning and then fails later with an
+      # unrelated adb error. Here a download is retried and checked.
+      - name: Install the emulator and system image, only when not cached
+        if: steps.emulator-cache.outputs.cache-hit != 'true'
+        run: scripts/ci-install-emulator
+
+      - name: Save the emulator and system image
+        if: steps.emulator-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            binaries/android-sdk/emulator
+            binaries/android-sdk/system-images/android-35/default/x86_64
+          key: android-sdk-emulator-35-default-x86_64
 
       # The emulator needs hardware acceleration to be usable, and the runner
       # ships /dev/kvm owned by a group the job's user is not in. This rule
@@ -125,6 +160,15 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Device created and snapshotted for the cache."
+
+      - name: Save the device and its snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: android-avd-35-default-x86_64-disk2g-pixel6
 
       # The runner's emulator is emulator-5554, where the Makefile expects
       # the local one at emulator-5556, so the serial is passed in.
