@@ -51,6 +51,8 @@ OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}"
 TESTPEER="$ROOT/scripts/testpeer"
 EMULATOR="$ROOT/scripts/emulator"
 STARTED_PEER=0
+# 1 once this run has restarted adbd as root; finish puts it back.
+ROOTED=0
 T0=$(date +%s)
 
 log() { echo "[network-test +$(($(date +%s) - T0))s] $*"; }
@@ -272,6 +274,18 @@ no_protect_failures() {
     log "no VpnService.protect failures in the app's log so far"
 }
 
+# Clears the emulator's log, trying up to 5 times. On Android 8 logcat -c
+# sometimes answers "failed to clear the 'main' log" right after an install,
+# and a second try a moment later works.
+clear_log() {
+    local i
+    for i in 1 2 3 4 5; do
+        adb_ logcat -c && return 0
+        sleep 1
+    done
+    return 1
+}
+
 # Number of "mdns(android): using interfaces:" log lines.
 mdns_lines() {
     adb_ logcat -d -b main 2>/dev/null | grep -cF 'mdns(android): using interfaces:' || true
@@ -317,9 +331,57 @@ wait_wlan0() {
     return 1
 }
 
+# The device's API level, such as 26 or 35.
+sdk_level() {
+    adb_ shell getprop ro.build.version.sdk | tr -d '\r'
+}
+
+# True when the device has "cmd connectivity airplane-mode", which Android 9
+# added: asked for the state, it answers "enabled" or "disabled". Older
+# versions answer "No shell command implementation."
+has_airplane_cmd() {
+    case "$(adb_ shell cmd connectivity airplane-mode 2>/dev/null | tr -d '\r')" in
+        enabled | disabled) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Restarts adbd as root unless it is already, and waits up to 30 seconds
+# for it to answer as root, setting ROOTED when it restarted adbd. The
+# default emulator images allow this; Google Play images do not.
+adb_as_root() {
+    local i
+    [ "$(adb_ shell id -u 2>/dev/null | tr -d '\r')" = 0 ] && return 0
+    adb_ root >/dev/null 2>&1 || return 1
+    ROOTED=1
+    for i in $(seq 30); do
+        sleep 1
+        [ "$(adb_ shell id -u 2>/dev/null | tr -d '\r')" = 0 ] && return 0
+    done
+    return 1
+}
+
+# Turns airplane mode on ($1 "enable") or off ("disable"). Without
+# "cmd connectivity airplane-mode" the setting is written and the
+# AIRPLANE_MODE broadcast sent, which needs adbd running as root
+# (see adb_as_root, done before the switch steps).
+airplane_mode() {
+    if has_airplane_cmd; then
+        adb_ shell cmd connectivity airplane-mode "$1"
+        return
+    fi
+    local on=0 state=false
+    if [ "$1" = enable ]; then
+        on=1
+        state=true
+    fi
+    adb_ shell settings put global airplane_mode_on "$on" &&
+        adb_ shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state "$state" >/dev/null
+}
+
 # Puts Wi-Fi on and airplane mode off, whatever state a step left them in.
 restore_network() {
-    adb_ shell cmd connectivity airplane-mode disable >/dev/null 2>&1
+    airplane_mode disable >/dev/null 2>&1
     adb_ shell svc wifi enable >/dev/null 2>&1
 }
 
@@ -332,6 +394,9 @@ finish() {
     adb_ shell am force-stop "$PACKAGE" >/dev/null 2>&1
     # Removes the stored key and settings from the device.
     adb_ shell pm clear "$PACKAGE" >/dev/null 2>&1
+    if [ "$ROOTED" = 1 ]; then
+        adb_ unroot >/dev/null 2>&1
+    fi
     if [ "$STARTED_PEER" = 1 ]; then
         "$TESTPEER" down
     fi
@@ -367,10 +432,15 @@ screens() {
 
 # True when the emulator has an IPv4 address on its virtual Wi-Fi or
 # Ethernet and a default route through the emulator's gateway (10.0.2.2),
-# which is also where the test peer's port is forwarded.
+# which is also where the test peer's port is forwarded. Images before
+# Android 11 put Wi-Fi and mobile data behind a router of their own, with
+# gateways such as 192.168.232.1 that still reach 10.0.2.2, so there any
+# IPv4 default route on wlan0 or eth0 will do.
 network_ready() {
+    local gateway='10\.0\.2\.2 '
+    [ "$(sdk_level)" -ge 30 ] || gateway='[0-9.]+ dev (wlan0|eth0) '
     adb_ shell ip -4 -o addr show 2>/dev/null | grep -qE ' (wlan0|eth0) +inet ' &&
-        adb_ shell ip route show table all 2>/dev/null | grep -q '^default via 10\.0\.2\.2 '
+        adb_ shell ip route show table all 2>/dev/null | grep -qE "^default via $gateway"
 }
 
 # A CI emulator once booted with no network at all, and the test then spent
@@ -425,7 +495,7 @@ main() {
     adb_ shell pm clear "$PACKAGE" >/dev/null
     # A large buffer keeps the whole run in the log so the checks below see it.
     adb_ logcat -G 16M
-    adb_ logcat -c
+    clear_log || fail "could not clear the emulator's log"
 
     # The files go straight from the key file into the app's private
     # storage, so the key never appears on a command line. They go through
@@ -474,6 +544,10 @@ main() {
 
     if [ "$SWITCH" != 0 ]; then
         local mdns_before mdns_off
+        if ! has_airplane_cmd; then
+            adb_as_root || fail "airplane mode needs adbd as root on $SERIAL, and adb root did not work"
+            log "adbd runs as root for the AIRPLANE_MODE broadcast"
+        fi
         mdns_off=$(mdns_lines)
         switch_step wifi-off 'adb_ shell svc wifi disable; wait_wlan0 down || fail "wlan0 did not go down"'
         if [ "$MDNS_CHECK" != 0 ]; then
@@ -491,12 +565,12 @@ main() {
             done
             log "the app restarted mDNS on wlan0 after Wi-Fi came back"
         fi
-        switch_step airplane 'adb_ shell cmd connectivity airplane-mode enable
+        switch_step airplane 'airplane_mode enable
             [ "$(adb_ shell settings get global airplane_mode_on | tr -d "\r")" = 1 ] || fail "airplane mode did not turn on"
             wait_wlan0 down || fail "wlan0 did not go down in airplane mode"
             sleep 10
             start=$(date +%s)
-            adb_ shell cmd connectivity airplane-mode disable
+            airplane_mode disable
             wait_wlan0 up || fail "wlan0 did not come back after airplane mode"'
     fi
 
