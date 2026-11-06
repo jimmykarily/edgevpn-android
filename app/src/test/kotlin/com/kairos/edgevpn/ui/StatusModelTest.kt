@@ -141,4 +141,14 @@ class StatusModelTest {
         assertEquals(Ago.Hours(2), formatAgo(7200))
         assertEquals(Ago.Days(2), formatAgo(2 * 86400L))
     }
+
+    @Test
+    fun readsTheDeviceThatHoldsThisPhonesAddress() {
+        val clash = snapshot("", state = "looking")
+            .replace("\"helpers\":3", "\"helpers\":3,\"addressInUse\":{\"id\":\"12D3KooWOther\",\"name\":\"testpeer\"}")
+        assertEquals(AddressInUse("12D3KooWOther", "testpeer"), parseStatus(clash, 1000).addressInUse)
+        val unnamed = clash.replace("\"name\":\"testpeer\"", "\"name\":\"localhost\"")
+        assertEquals(AddressInUse("12D3KooWOther", null), parseStatus(unnamed, 1000).addressInUse)
+        assertNull(parseStatus(snapshot(""), 1000).addressInUse)
+    }
 }

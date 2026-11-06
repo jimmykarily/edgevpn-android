@@ -80,6 +80,8 @@
     </plurals>
     <string name="state_connected_text_one">You can reach your device.</string>
     <string name="state_problem_title">The VPN could not run</string>
+    <string name="address_in_use_text">Another device already uses %1$s. Pick another address in Settings.</string>
+    <string name="button_change_address">Change address</string>
     <string name="state_problem_text">Something went wrong while starting the VPN.</string>
     <string name="button_turn_on">Turn on</string>
     <string name="button_turn_off">Turn off</string>
@@ -210,5 +212,8 @@
     <string name="help_phone_id_tech">The libp2p peer ID, derived from the phone\'s Ed25519 identity key. It signs this phone\'s ledger entries.</string>
     <string name="help_start_fresh_title">Start fresh</string>
     <string name="help_start_fresh_plain">Makes this phone forget everything and start over as a new device.</string>
+    <string name="help_address_in_use_title">Address already in use</string>
+    <string name="help_address_in_use_plain">Another device in your network has the same address as this phone. Your network keeps only one device per address, so your other devices can\'t see this phone until one of the two moves to another address.</string>
+    <string name="help_address_in_use_tech">The machines ledger entry under this phone\'s address has another peer ID. Only the owner of an entry may change it while the owner\'s heartbeat is fresh (the ownership TTL, 8 minutes by default), so this phone\'s announcement is rejected. Right after Start fresh this also shows for up to that long, because the old identity still owns the entry.</string>
     <string name="help_start_fresh_tech">Deletes the network token, the Ed25519 identity key (so a new peer ID is generated) and all settings and logs. The old ledger entries stay owned by the old identity until the ownership TTL (8 minutes) expires.</string>
 </resources>

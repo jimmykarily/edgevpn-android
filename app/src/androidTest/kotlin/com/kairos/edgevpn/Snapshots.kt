@@ -45,6 +45,18 @@ object Snapshots {
         lastHeard = JSONObject().put("at", now - 30).put("name", "desktop"),
     ).toString()
 
+    /**
+     * Looking for devices while another device, [OTHER_NAME], holds this phone's address 10.1.0.2,
+     * so the network never lists this phone.
+     */
+    fun lookingWithAddressInUse(now: Long = now()): String =
+        snapshot(state = "looking", startedAt = now - 40, helpers = 3)
+            .put("addressInUse", JSONObject().put("id", OTHER_ID).put("name", OTHER_NAME))
+            .toString()
+
+    const val OTHER_ID = "12D3KooWOtherPhone"
+    const val OTHER_NAME = "old-phone"
+
     fun problem(error: String, now: Long = now()): String =
         snapshot(state = "problem", error = error, failedAt = now - 20).toString()
 
