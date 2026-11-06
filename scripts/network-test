@@ -469,6 +469,23 @@ wait_for_network() {
     log "emulator network ready"
 }
 
+# The switch steps need the emulator on Wi-Fi. The local AVD has the
+# emulator's own "AndroidWifi" network saved, but the CI device has no saved
+# Wi-Fi network and comes up on mobile data only, so Wi-Fi off and on would
+# change nothing. This joins AndroidWifi when wlan0 has no address. On
+# Android 10 and older `cmd wifi connect-network` does not exist, and those
+# emulators are expected to have the network saved.
+ensure_wifi() {
+    wait_wlan0 up 5 && return 0
+    log "wlan0 has no address; joining the emulator's AndroidWifi network"
+    adb_ shell svc wifi enable || true
+    if [ "$(sdk_level)" -ge 30 ]; then
+        adb_ shell cmd wifi connect-network AndroidWifi open >/dev/null 2>&1 || true
+    fi
+    wait_wlan0 up 120 || fail "the emulator has no Wi-Fi: wlan0 got no address within 120s of joining AndroidWifi"
+    log "joined AndroidWifi"
+}
+
 main() {
     rm -rf "$OUT"
     mkdir -p "$OUT"
@@ -486,6 +503,7 @@ main() {
     peer=$("$TESTPEER" addr)
     log "peer at $peer"
     wait_for_network
+    [ "$SWITCH" = 0 ] || ensure_wifi
 
     # A device that ran tests before may still have the app, signed with
     # another machine's debug key; Android then refuses to install over it.
