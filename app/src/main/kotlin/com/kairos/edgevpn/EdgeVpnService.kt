@@ -13,8 +13,6 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.system.OsConstants
 import android.util.Log
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import androidx.core.app.NotificationCompat
 import edgevpn.Edgevpn
 import edgevpn.SocketProtector
@@ -41,27 +39,22 @@ class EdgeVpnService : VpnService() {
     private var multicastLock: WifiManager.MulticastLock? = null
 
     /** Wraps VpnService.protect(int) so Go can call it via the SocketProtector interface.
-     * Must run on the main thread or protect() can fail with "operation not permitted". */
+     * It runs on the calling thread: protect() is a binder call to the system, and a hop
+     * to the main thread would make every dial wait for the main looper. protect never
+     * failed off the main thread in the network test runs on an API 35 emulator; vendor
+     * phone builds are untested, so a "VpnService.protect(...) returned false" log line
+     * is the sign to look for. A Java exception thrown into a gomobile callback aborts
+     * the process, so any failure is reported as false instead. */
     private val socketProtector = object : SocketProtector {
         override fun protect(fd: Long): Boolean {
-            if (Looper.getMainLooper().isCurrentThread) {
-                val ok = this@EdgeVpnService.protect(fd.toInt())
-                if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
-                return ok
-            }
-            val latch = CountDownLatch(1)
-            val result = BooleanArray(1)
-            val mainHandler = Handler(Looper.getMainLooper())
-            mainHandler.postAtFrontOfQueue {
-                result[0] = this@EdgeVpnService.protect(fd.toInt())
-                if (!result[0]) Log.w(TAG, "VpnService.protect($fd) returned false")
-                latch.countDown()
-            }
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                Log.e(TAG, "VpnService.protect($fd) timed out (5s) waiting for main thread")
+            val ok = try {
+                this@EdgeVpnService.protect(fd.toInt())
+            } catch (t: Throwable) {
+                Log.w(TAG, "VpnService.protect($fd) threw $t")
                 return false
             }
-            return result[0]
+            if (!ok) Log.w(TAG, "VpnService.protect($fd) returned false")
+            return ok
         }
     }
 
@@ -227,6 +220,7 @@ class EdgeVpnService : VpnService() {
         isRunning = false
         tunPfd = null
         Edgevpn.setStatusListener(null)
+        Edgevpn.setSocketProtector(null)
         mainHandler.removeCallbacks(statusTicker)
         multicastLock?.let {
             if (it.isHeld) it.release()
