@@ -16,8 +16,9 @@
 # NETWORK_TEST_SWITCH=0 skips the part that switches the emulator's network
 # (Wi-Fi off, Wi-Fi on, airplane mode); NETWORK_TEST_SWITCH_TIMEOUT is the
 # number of seconds each step has to get pings working both ways again.
-# NETWORK_TEST_MDNS_CHECK=0 skips the check that the app logs a fresh
-# "mdns(android): using interfaces:" line listing wlan0 after Wi-Fi is back.
+# NETWORK_TEST_MDNS_CHECK=0 skips the mDNS checks: no fresh
+# "mdns(android): using interfaces:" line while Wi-Fi is off, and a fresh one
+# listing wlan0 after Wi-Fi is back.
 
 set -euo pipefail
 
@@ -278,6 +279,11 @@ no_protect_failures() {
     log "no VpnService.protect failures in the app's log so far"
 }
 
+# Number of "mdns(android): using interfaces:" log lines.
+mdns_lines() {
+    adb_ logcat -d -b main 2>/dev/null | grep -cF 'mdns(android): using interfaces:' || true
+}
+
 # Number of "mdns(android): using interfaces:" log lines that list wlan0.
 mdns_wlan0_lines() {
     adb_ logcat -d -b main 2>/dev/null | grep -F 'mdns(android): using interfaces:' | grep -c 'wlan0' || true
@@ -471,8 +477,13 @@ main() {
     screens
 
     if [ "$SWITCH" != 0 ]; then
-        local mdns_before
+        local mdns_before mdns_off
+        mdns_off=$(mdns_lines)
         switch_step wifi-off 'adb_ shell svc wifi disable; wait_wlan0 down || fail "wlan0 did not go down"'
+        if [ "$MDNS_CHECK" != 0 ]; then
+            [ "$(mdns_lines)" -eq "$mdns_off" ] || fail "the app started mDNS on mobile data after Wi-Fi went off"
+            log "the app kept mDNS off on mobile data"
+        fi
         mdns_before=$(mdns_wlan0_lines)
         switch_step wifi-on 'adb_ shell svc wifi enable; wait_wlan0 up || fail "wlan0 did not come up"'
         if [ "$MDNS_CHECK" != 0 ]; then
