@@ -385,6 +385,17 @@ func TestNetworkChangedBeforeHostReadyOnlyRecordsTheValue(t *testing.T) {
 	}
 }
 
+func TestNetworkChangedWithoutASessionContextDoesNothing(t *testing.T) {
+	t.Cleanup(Stop)
+	calls := installNetChange(t)
+	setSession(newTestNode(t), true, nil, nil)
+	NetworkChanged(true)
+	time.Sleep(80 * time.Millisecond)
+	if got := calls(); len(got) != 0 {
+		t.Fatalf("the steps ran without a session context: %v", got)
+	}
+}
+
 func TestStopDropsAPendingNetworkChange(t *testing.T) {
 	calls := installNetChange(t)
 	setSession(newTestNode(t), true, nil, context.Background())

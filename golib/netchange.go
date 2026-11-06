@@ -180,19 +180,16 @@ func NetworkChanged(onLocalNetwork bool) {
 }
 
 // runNetChange is the debounced work. It runs the network steps only when
-// the session of the last NetworkChanged call is still current and its host
-// is ready.
+// the session of the last NetworkChanged call is still current, has a
+// context and its host is ready.
 func runNetChange(onLocal bool) {
 	mu.Lock()
 	n := netChangeNode
 	ok := n != nil && currentNode == n && hostReady
 	ctx, r := sessionCtx, currentMDNS
 	mu.Unlock()
-	if !ok {
+	if !ok || ctx == nil {
 		return
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	netChangeSteps(ctx, n, hostOf(n), r, onLocal)
 }
