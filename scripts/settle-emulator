@@ -8,14 +8,18 @@
 # then fails with "Waited for the root of the view hierarchy to have window
 # focus". The screen tests and the network test both run this first.
 #
-# Usage: scripts/settle-emulator [timeout seconds, default 120]
+# Usage: scripts/settle-emulator [timeout seconds, default 300]
+#
+# On a 2-core CI runner the popups can keep coming for about four minutes
+# after boot. When the time is up, only a popup that still has the focus
+# fails the run; any other focus counts as settled.
 # Uses ANDROID_SERIAL and the Makefile's adb (or EDGEVPN_ADB).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ADB="${EDGEVPN_ADB:-$ROOT/binaries/android-sdk/platform-tools/adb}"
 SERIAL="${ANDROID_SERIAL:?ANDROID_SERIAL must name the emulator}"
-TIMEOUT="${1:-120}"
+TIMEOUT="${1:-300}"
 STABLE_SECONDS=6
 
 adb_() { "$ADB" -s "$SERIAL" "$@"; }
@@ -58,7 +62,11 @@ waited=0
 stable=0
 while [ "$stable" -lt "$STABLE_SECONDS" ]; do
     if [ "$waited" -ge "$TIMEOUT" ]; then
-        echo "settle-emulator: a system popup still has the focus after ${TIMEOUT}s: $(focus)" >&2
+        current=$(focus)
+        if [ -n "$current" ] && ! popup "$current"; then
+            break
+        fi
+        echo "settle-emulator: a system popup still has the focus after ${TIMEOUT}s: $current" >&2
         exit 1
     fi
     current=$(focus)
