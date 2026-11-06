@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Gets a freshly booted emulator ready for screen tests: waits until no
+# system popup holds the focus, answering "isn't responding" and "keeps
+# stopping" popups on the way.
+#
+# A CI emulator that has just booted often shows "System UI isn't
+# responding". The popup takes the window focus, and every Espresso test
+# then fails with "Waited for the root of the view hierarchy to have window
+# focus". The screen tests and the network test both run this first.
+#
+# Usage: scripts/settle-emulator [timeout seconds, default 120]
+# Uses ANDROID_SERIAL and the Makefile's adb (or EDGEVPN_ADB).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ADB="${EDGEVPN_ADB:-$ROOT/binaries/android-sdk/platform-tools/adb}"
+SERIAL="${ANDROID_SERIAL:?ANDROID_SERIAL must name the emulator}"
+TIMEOUT="${1:-120}"
+STABLE_SECONDS=6
+
+adb_() { "$ADB" -s "$SERIAL" "$@"; }
+
+focus() {
+    adb_ shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus=' | sed 's/^ *mCurrentFocus=//' | tr -d '\r'
+}
+
+popup() {
+    case "$1" in
+        *"Application Not Responding"* | *"Application Error"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Taps the button of the popup on screen that lets things carry on: "Wait"
+# for a popup about an app that is not responding, "Close app" for one about
+# an app that stopped.
+answer_popup() {
+    local xml xy
+    xml=$(adb_ exec-out uiautomator dump /dev/tty 2>/dev/null) || return 0
+    xy=$(printf '%s' "$xml" | python3 -I -c '
+import re, sys
+xml = sys.stdin.read()
+nodes = [dict(re.findall(r"([\w-]+)=\"([^\"]*)\"", n)) for n in re.findall(r"<node [^>]*>", xml)]
+for label in ("wait", "close app", "ok"):
+    for n in nodes:
+        if n.get("text", "").strip().lower() == label and n.get("clickable") == "true":
+            x1, y1, x2, y2 = map(int, re.findall(r"\d+", n["bounds"]))
+            print((x1 + x2) // 2, (y1 + y2) // 2)
+            sys.exit(0)
+')
+    if [ -n "$xy" ]; then
+        # shellcheck disable=SC2086
+        adb_ shell input tap $xy
+    fi
+}
+
+waited=0
+stable=0
+while [ "$stable" -lt "$STABLE_SECONDS" ]; do
+    if [ "$waited" -ge "$TIMEOUT" ]; then
+        echo "settle-emulator: a system popup still has the focus after ${TIMEOUT}s: $(focus)" >&2
+        exit 1
+    fi
+    current=$(focus)
+    if [ -z "$current" ] || popup "$current"; then
+        [ -n "$current" ] && echo "settle-emulator: answering $current"
+        answer_popup
+        adb_ shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
+        stable=0
+    else
+        stable=$((stable + 2))
+    fi
+    sleep 2
+    waited=$((waited + 2))
+done
+echo "settle-emulator: focus on $(focus)"
