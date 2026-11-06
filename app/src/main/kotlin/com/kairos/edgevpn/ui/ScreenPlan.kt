@@ -48,7 +48,7 @@ fun planScreen(m: StatusModel): ScreenPlan {
         secondTile = secondTile,
         showSeeLogs = m.state == VpnState.PROBLEM,
         onlyDevice = m.state == VpnState.CONNECTED && m.total == 1,
-        showAddressInUse = running && m.addressInUse != null && m.selfAddress.isNotEmpty(),
+        showAddressInUse = running && m.addressInUse && m.selfAddress.isNotEmpty(),
     )
 }
 

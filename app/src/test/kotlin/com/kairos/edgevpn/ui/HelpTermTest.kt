@@ -113,18 +113,9 @@ class HelpTermTest {
     }
 
     @Test
-    fun addressInUseNamesTheOtherDevice() {
-        val clash = model.copy(state = VpnState.LOOKING, addressInUse = AddressInUse("12D3KooWOther", "testpeer"))
-        assertEquals(
-            listOf("Address" to "10.1.0.2", "Used by" to "testpeer", "Their device ID" to "12D3KooWOther"),
-            liveValues(HelpTerm.ADDRESS_IN_USE, clash, null),
-        )
-        val unnamed = clash.copy(addressInUse = AddressInUse("12D3KooWOther", null))
-        assertEquals(
-            listOf("Address" to "10.1.0.2", "Their device ID" to "12D3KooWOther"),
-            liveValues(HelpTerm.ADDRESS_IN_USE, unnamed, null),
-        )
-        assertEquals(listOf("Address" to "10.1.0.2"), liveValues(HelpTerm.ADDRESS_IN_USE, model, null))
+    fun addressInUseShowsTheAddress() {
+        val clash = model.copy(state = VpnState.LOOKING, addressInUse = true)
+        assertEquals(listOf("Address" to "10.1.0.2"), liveValues(HelpTerm.ADDRESS_IN_USE, clash, null))
     }
 
     @Test

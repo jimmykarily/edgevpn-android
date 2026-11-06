@@ -140,15 +140,8 @@ class MainScreenTest {
 
             onView(withId(R.id.addressInUseText)).perform(clickHelpIcon())
             onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Address already in use"))))
-            onView(withId(R.id.helpLive)).perform(nestedScrollTo()).check(
-                matches(
-                    allOf(
-                        withText(containsString("Address: 10.1.0.2")),
-                        withText(containsString("Used by: ${Snapshots.OTHER_NAME}")),
-                        withText(containsString("Their device ID: ${Snapshots.OTHER_ID}")),
-                    )
-                )
-            )
+            onView(withId(R.id.helpLive)).perform(nestedScrollTo())
+                .check(matches(withText(containsString("Address: 10.1.0.2"))))
             pressBack()
 
             onView(withId(R.id.changeAddressButton)).check(matches(allOf(isDisplayed(), withText("Change address"))))

@@ -17,7 +17,7 @@ class ScreenPlanTest {
         devices: List<DeviceRow> = emptyList(),
         lastHeard: Long? = null,
         address: String = "10.1.0.2",
-        addressInUse: AddressInUse? = null,
+        addressInUse: Boolean = false,
     ) = StatusModel(
         state = state, reachable = devices.count { it.badge != Badge.OFFLINE }, total = devices.size,
         selfAddress = address, selfId = "me", runningSeconds = 40, error = null, devices = devices,
@@ -116,13 +116,12 @@ class ScreenPlanTest {
 
     @Test
     fun theAddressWarningShowsWhileRunningWhenAnotherDeviceHoldsTheAddress() {
-        val other = AddressInUse("12D3KooWOther", "testpeer")
-        assertTrue(planScreen(model(VpnState.LOOKING, addressInUse = other)).showAddressInUse)
-        assertTrue(planScreen(model(VpnState.CONNECTED, addressInUse = other)).showAddressInUse)
-        assertFalse(planScreen(model(VpnState.OFF, addressInUse = other)).showAddressInUse)
-        assertFalse(planScreen(model(VpnState.PROBLEM, addressInUse = other)).showAddressInUse)
+        assertTrue(planScreen(model(VpnState.LOOKING, addressInUse = true)).showAddressInUse)
+        assertTrue(planScreen(model(VpnState.CONNECTED, addressInUse = true)).showAddressInUse)
+        assertFalse(planScreen(model(VpnState.OFF, addressInUse = true)).showAddressInUse)
+        assertFalse(planScreen(model(VpnState.PROBLEM, addressInUse = true)).showAddressInUse)
         assertFalse(planScreen(model(VpnState.LOOKING)).showAddressInUse)
-        assertFalse(planScreen(model(VpnState.LOOKING, address = "", addressInUse = other)).showAddressInUse)
+        assertFalse(planScreen(model(VpnState.LOOKING, address = "", addressInUse = true)).showAddressInUse)
     }
 
     private fun net(internet: Boolean = true, vpn: Boolean = false, wifi: Boolean = false, cellular: Boolean = false) =

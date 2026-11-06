@@ -144,6 +144,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	failedAt = time.Time{}
 	selfAddress = address
 	selfName = name
+	forgetRejectedEntries()
 
 	tunFile = os.NewFile(uintptr(fd), "tun")
 	if tunFile == nil {
@@ -350,6 +351,7 @@ func Stop() {
 	hostReady = false
 	selfAddress = ""
 	selfName = ""
+	forgetRejectedEntries()
 	if tunFile != nil {
 		if err := tunFile.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
 			emit("WARN ", fmt.Sprintf("failed to close tun file in Stop(): %v", err))
