@@ -15,10 +15,11 @@ permissions:
   contents: read
 
 jobs:
-  # make test (the scrub-key self-test, the Go tests and the app's JVM unit
-  # tests) and make lint (Android lint, failing on errors only). Neither
-  # needs a device, a network key or a secret, so this job finishes long
-  # before the emulator jobs and is the first to show a broken change.
+  # make test (the self-tests of scripts/scrub-key and scripts/vpn-routes,
+  # the Go tests and the app's JVM unit tests) and make lint (Android lint,
+  # failing on errors only). Neither needs a device, a network key or a
+  # secret, so this job finishes long before the emulator jobs and is the
+  # first to show a broken change.
   test:
     name: Unit tests and lint
     runs-on: ubuntu-latest

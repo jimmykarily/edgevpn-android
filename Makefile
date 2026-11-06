@@ -150,7 +150,8 @@ release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	@ls app/build/outputs/apk/release/*.apk
 
 # ── Tests ────────────────────────────────────────────────────────
-# The network test's key scrubber and the Go tests run on the build host.
+# The network test's helpers (the key scrubber and the VPN route reader)
+# and the Go tests run on the build host.
 # The app's unit tests run on the JVM and need the AAR, because the app
 # module links against it.
 test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
