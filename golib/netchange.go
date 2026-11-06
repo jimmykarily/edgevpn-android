@@ -286,8 +286,9 @@ func redialTargets(selfID peer.ID, bootstrap []string, machinePeerIDs []string) 
 // keeps the error of the direct address and waits for the relay. edgevpn opens
 // its VPN streams without allowing relayed connections, so libp2p holds them
 // until a direct connection exists, and without the second dial traffic to
-// that peer stops until something else dials it directly. The relayed connection stays when the direct dial fails. It
-// returns how many it dialled and how many connected.
+// that peer stops until something else dials it directly. The relayed
+// connection stays when the direct dial fails (see dialDirect). It returns
+// how many it dialled and how many connected.
 func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled, connected int) {
 	var wg sync.WaitGroup
 	var countMu sync.Mutex
@@ -308,11 +309,7 @@ func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled,
 				return
 			}
 			if onlyLimited(h.Network().ConnsToPeer(t.ID)) {
-				if sw, ok := h.Network().(*swarm.Swarm); ok {
-					sw.Backoff().Clear(t.ID)
-				}
-				err := h.Connect(network.WithForceDirectDial(dctx, "relayed after a network change"), t)
-				emit("DEBUG", fmt.Sprintf("redial: %s was reached only through a relay; direct dial: %v", t.ID, errOrOK(err)))
+				dialDirect(dctx, h, t)
 			}
 			countMu.Lock()
 			connected++
@@ -321,6 +318,44 @@ func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled,
 	}
 	wg.Wait()
 	return dialled, connected
+}
+
+// directRetryDelay is how long dialDirect waits before its second try.
+// Tests shorten it.
+var directRetryDelay = 100 * time.Millisecond
+
+// connectDirect dials t with direct addresses only. Tests replace it.
+var connectDirect = func(ctx context.Context, h host.Host, t peer.AddrInfo) error {
+	return h.Connect(network.WithForceDirectDial(ctx, "relayed after a network change"), t)
+}
+
+// dialDirect dials t directly, past the dial backoff, for a peer that h
+// reaches only through a relay, and logs the outcome. The first try can
+// join the dial that produced the relayed connection, while another caller
+// of that dial has not returned yet. libp2p then answers at once with the
+// errors that dial collected, without trying the direct addresses again.
+// So a failed first try, with the relayed connection still the only one, is
+// followed by one more after directRetryDelay, by when that dial has ended.
+// Both tries share ctx.
+func dialDirect(ctx context.Context, h host.Host, t peer.AddrInfo) {
+	clearBackoff := func() {
+		if sw, ok := h.Network().(*swarm.Swarm); ok {
+			sw.Backoff().Clear(t.ID)
+		}
+	}
+	clearBackoff()
+	err := connectDirect(ctx, h, t)
+	if err != nil && onlyLimited(h.Network().ConnsToPeer(t.ID)) {
+		emit("DEBUG", fmt.Sprintf("redial: direct dial to %s failed: %v; trying again in %v", t.ID, err, directRetryDelay))
+		select {
+		case <-time.After(directRetryDelay):
+			clearBackoff()
+			err = connectDirect(ctx, h, t)
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+	}
+	emit("DEBUG", fmt.Sprintf("redial: %s was reached only through a relay; direct dial: %v", t.ID, errOrOK(err)))
 }
 
 // onlyLimited reports whether conns is not empty and every one of them is
@@ -334,6 +369,7 @@ func onlyLimited(conns []network.Conn) bool {
 	return len(conns) > 0
 }
 
+// errOrOK returns err's message, or "ok" when err is nil, for log lines.
 func errOrOK(err error) string {
 	if err != nil {
 		return err.Error()
