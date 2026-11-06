@@ -63,9 +63,10 @@ jobs:
       # download and build everything again.
 
       # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
-      # downloads into binaries/, cached like in the preview job. The emulator
-      # and its system image live in the same SDK but are left out here,
-      # because the next cache holds them under a key of their own.
+      # downloads into binaries/, under the cache every workflow shares (see
+      # the unit tests job). The emulator and its system image live in the
+      # same SDK but are left out, because the next cache holds them under a
+      # key of their own.
       - name: Restore the build tools
         id: tools-cache
         uses: actions/cache/restore@v5
@@ -74,7 +75,8 @@ jobs:
             binaries
             !binaries/android-sdk/emulator
             !binaries/android-sdk/system-images
-          key: e2e-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+            !binaries/testpeer
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       # The system image is about 1.7GB and the emulator another 800MB, the
       # same bytes on every run. The key names the exact image, so a change
@@ -125,7 +127,8 @@ jobs:
             binaries
             !binaries/android-sdk/emulator
             !binaries/android-sdk/system-images
-          key: e2e-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+            !binaries/testpeer
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       # Installed here rather than left to the emulator runner, which reports
       # a broken download only as a warning and then fails later with an

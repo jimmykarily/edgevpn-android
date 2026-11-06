@@ -39,10 +39,21 @@ jobs:
       # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
       # downloads into binaries/, under the same key as the preview job, so
       # the two share one cache entry.
+      # The JDK, Android SDK and NDK, Gradle and gomobile that the Makefile
+      # downloads into binaries/. Every workflow caches them with the same
+      # paths and key, so GitHub stores them once per branch instead of once
+      # per workflow. GitHub keeps at most 10 GB of caches per repository and
+      # drops the oldest beyond that, and this bundle is about 1.2 GB. The
+      # emulator, its system image and the test peer's files are left out;
+      # the E2E and network jobs cache them under keys of their own.
       - name: Cache the build tools
         uses: actions/cache@v5
         with:
-          path: binaries
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+            !binaries/testpeer
           key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       - name: Run the unit tests

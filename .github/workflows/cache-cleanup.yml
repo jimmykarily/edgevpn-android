@@ -1,0 +1,29 @@
+name: Cache cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+# Caches saved by a pull request's runs belong to its merge ref, which
+# nothing reads once the pull request is closed. GitHub keeps them for a
+# week and counts them against the repository's 10 GB, so they push out the
+# caches of main and of open pull requests. This deletes them as soon as the
+# pull request is closed or merged.
+jobs:
+  cleanup:
+    name: Delete the pull request's caches
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete the caches of this pull request's merge ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          ids=$(gh cache list --ref "$REF" --limit 100 --json id --jq '.[].id')
+          for id in $ids; do
+            gh cache delete "$id"
+          done
+          echo "deleted $(echo "$ids" | grep -c . || true) caches of $REF"
