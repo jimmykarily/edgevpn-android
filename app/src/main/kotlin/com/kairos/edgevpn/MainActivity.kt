@@ -66,6 +66,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var mainButton: MaterialButton
     private lateinit var seeLogsButton: View
+    private lateinit var addressInUseText: TextView
+    private lateinit var changeAddressButton: View
     private lateinit var pills: View
     private lateinit var addressPill: View
     private lateinit var addressValue: TextView
@@ -126,6 +128,8 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         mainButton = findViewById(R.id.mainButton)
         seeLogsButton = findViewById(R.id.seeLogsButton)
+        addressInUseText = findViewById(R.id.addressInUseText)
+        changeAddressButton = findViewById(R.id.changeAddressButton)
         pills = findViewById(R.id.pills)
         addressPill = findViewById(R.id.addressPill)
         addressValue = findViewById(R.id.addressValue)
@@ -157,6 +161,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         seeLogsButton.setOnClickListener { openLogs() }
+        changeAddressButton.setOnClickListener { openSettings() }
         if (savedInstanceState == null) connectIfAsked(intent)
     }
 
@@ -268,6 +273,12 @@ class MainActivity : AppCompatActivity() {
             }
         )
         seeLogsButton.visibility = visibleIf(plan.showSeeLogs)
+        addressInUseText.visibility = visibleIf(plan.showAddressInUse)
+        changeAddressButton.visibility = visibleIf(plan.showAddressInUse)
+        if (plan.showAddressInUse) {
+            addressInUseText.text = getString(R.string.address_in_use_text, m.selfAddress)
+            addressInUseText.appendHelpIcon(HelpTerm.ADDRESS_IN_USE) { openHelp(it) }
+        }
 
         pills.visibility = visibleIf(plan.showPills)
         addressPill.visibility = visibleIf(plan.showAddressPill)

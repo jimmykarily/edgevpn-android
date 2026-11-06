@@ -97,6 +97,33 @@
                         android:textSize="15sp"
                         tools:text="You can reach 2 of your 3 devices." />
 
+                    <!-- Shown when another device holds this phone's address. -->
+                    <TextView
+                        android:id="@+id/addressInUseText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingMultiplier="1.15"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:text="Another device already uses 10.1.0.2. Pick another address in Settings."
+                        tools:visibility="visible" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/changeAddressButton"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-12dp"
+                        android:text="@string/button_change_address"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        app:rippleColor="#33FFFFFF"
+                        tools:visibility="visible" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/seeLogsButton"
                         style="@style/Widget.Material3.Button.TextButton"

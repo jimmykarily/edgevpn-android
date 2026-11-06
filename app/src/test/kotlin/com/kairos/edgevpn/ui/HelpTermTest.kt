@@ -34,7 +34,7 @@ class HelpTermTest {
 
     @Test
     fun oneTermPerGlossaryRow() {
-        assertEquals(20, HelpTerm.values().size)
+        assertEquals(21, HelpTerm.values().size)
     }
 
     @Test
@@ -113,6 +113,21 @@ class HelpTermTest {
     }
 
     @Test
+    fun addressInUseNamesTheOtherDevice() {
+        val clash = model.copy(state = VpnState.LOOKING, addressInUse = AddressInUse("12D3KooWOther", "testpeer"))
+        assertEquals(
+            listOf("Address" to "10.1.0.2", "Used by" to "testpeer", "Their device ID" to "12D3KooWOther"),
+            liveValues(HelpTerm.ADDRESS_IN_USE, clash, null),
+        )
+        val unnamed = clash.copy(addressInUse = AddressInUse("12D3KooWOther", null))
+        assertEquals(
+            listOf("Address" to "10.1.0.2", "Their device ID" to "12D3KooWOther"),
+            liveValues(HelpTerm.ADDRESS_IN_USE, unnamed, null),
+        )
+        assertEquals(listOf("Address" to "10.1.0.2"), liveValues(HelpTerm.ADDRESS_IN_USE, model, null))
+    }
+
+    @Test
     fun sameNetworkShowsTheRemoteAddress() {
         assertEquals(
             listOf("Remote address" to "192.168.1.20:4001"),
@@ -188,6 +203,7 @@ class HelpTermTest {
             HelpTerm.DETAILED_LOGS to LiveScope.PHONE,
             HelpTerm.PHONE_ID to LiveScope.PHONE,
             HelpTerm.START_FRESH to LiveScope.PHONE,
+            HelpTerm.ADDRESS_IN_USE to LiveScope.PHONE,
         )
         assertEquals(HelpTerm.values().toSet(), expected.keys)
         for (t in HelpTerm.values()) assertEquals(t.name, expected[t], t.liveScope)
