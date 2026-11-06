@@ -64,8 +64,9 @@ jobs:
       # or by main, so a cache lost on main means a slow first run on every
       # new pull request. The E2E tests job explains the same layout.
 
-      # The same tools as the E2E tests job. The test peer's files are
-      # cached below under a key of their own.
+      # The same tools cache as every other workflow (see the unit tests
+      # job). The test peer's files are cached below under a key of their
+      # own.
       - name: Restore the build tools
         id: tools-cache
         uses: actions/cache/restore@v5
@@ -75,7 +76,7 @@ jobs:
             !binaries/android-sdk/emulator
             !binaries/android-sdk/system-images
             !binaries/testpeer
-          key: network-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       - name: Restore the emulator and system image
         id: emulator-cache
@@ -129,7 +130,7 @@ jobs:
             !binaries/android-sdk/emulator
             !binaries/android-sdk/system-images
             !binaries/testpeer
-          key: network-build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
+          key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       # Installed here rather than left to the emulator runner; see the E2E
       # tests job.

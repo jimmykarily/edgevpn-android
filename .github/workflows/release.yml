@@ -52,7 +52,11 @@ jobs:
       - name: Cache the build tools
         uses: actions/cache@v5
         with:
-          path: binaries
+          path: |
+            binaries
+            !binaries/android-sdk/emulator
+            !binaries/android-sdk/system-images
+            !binaries/testpeer
           key: build-tools-${{ hashFiles('Makefile', 'golib/go.mod') }}
 
       # versionName and versionCode come from this, in app/build.gradle.kts.
