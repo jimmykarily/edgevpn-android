@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Debounce: the work runs 500 ms after the last `NetworkChanged` call, with the last call's value; a call during a run gives exactly one more run.
-- Redial: bootstrap peers and every peer owning a machines ledger entry, in parallel, 10 second timeout each, context wrapped with `network.WithForceDirectDial`; skip peers that are still connected.
+- Redial: bootstrap peers and every peer owning a machines ledger entry, in parallel, 10 second timeout each, after clearing the swarm's dial backoff for the peer (never `network.WithForceDirectDial`, which drops relay addresses); skip peers that are still connected.
 - yamux: keepalive interval 10 seconds, ping timeout (`ConnectionWriteTimeout`) 5 seconds.
 - mDNS: edgevpn's own mDNS off (`Discovery.MDNS: false`); the app runs `discovery.MDNS{DiscoveryServiceTag: <token mdns field>}` itself, only while the last report says Wi-Fi or Ethernet. Never on mobile data, tethered setups included. The tag is a secret and never goes to the log.
 - Kotlin network choice: API 31+ `registerBestMatchingNetworkCallback`; API 26 to 30 `registerNetworkCallback` and a pure picker: validated first, then Wi-Fi, then Ethernet, then cellular. Request: `NET_CAPABILITY_INTERNET` and `NET_CAPABILITY_NOT_VPN`.
@@ -104,7 +104,7 @@
   - `TestNetworkChangedSkipsAStaleSession`: work scheduled for session A does nothing when session B is current when it fires (use the session check function, not a real host).
   - `TestNetworkChangedBeforeHostReadyOnlyRecordsTheValue`: the mDNS runner receives `setLocal(true)`; the work does not run its network steps.
 - [ ] **Step 2: Run** `cd golib && go test -run 'TestDebounce|TestRedial|TestNetworkChanged' ./...`, expect failures.
-- [ ] **Step 3: Implement.** The 500 ms delay and 10 s dial timeout from Global Constraints. Each dial context: `network.WithForceDirectDial(ctx, "network changed")`. Skip targets with `h.Network().Connectedness(id) == network.Connected`. `Stop` must stop the debouncer's pending timer.
+- [ ] **Step 3: Implement.** The 500 ms delay and 10 s dial timeout from Global Constraints. Before each dial, clear the peer's dial backoff (`h.Network().(*swarm.Swarm).Backoff().Clear(id)` when the network is a swarm); do not use `network.WithForceDirectDial`. Skip targets with `h.Network().Connectedness(id) == network.Connected`. `Stop` must stop the debouncer's pending timer.
 - [ ] **Step 4: Run** the focused tests with `-race`, then `make test`, expect PASS. `GOOS=android GOARCH=arm64 go build ./...` succeeds.
 - [ ] **Step 5: Commit.**
 
