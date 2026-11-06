@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Installs the Android emulator and the API 35 x86_64 system image into the
+# Makefile's SDK (binaries/android-sdk) for the CI jobs, retrying a broken
+# download.
+#
+# sdkmanager prints "An error occurred while preparing SDK package" for a
+# corrupt download and still exits 0, so success is decided by the files
+# being there, not by its exit code.
+set -euo pipefail
+
+ANDROID_HOME="${ANDROID_HOME:?ANDROID_HOME must point at the SDK}"
+SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+IMAGE="system-images;android-35;default;x86_64"
+IMAGE_DIR="$ANDROID_HOME/system-images/android-35/default/x86_64"
+ATTEMPTS=3
+
+installed() {
+    [ -x "$ANDROID_HOME/emulator/emulator" ] && [ -f "$IMAGE_DIR/system.img" ]
+}
+
+[ -x "$SDKMANAGER" ] || { echo "no sdkmanager at $SDKMANAGER (run make e2e-build first)" >&2; exit 1; }
+yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+
+for attempt in $(seq "$ATTEMPTS"); do
+    "$SDKMANAGER" --install emulator "$IMAGE" || true
+    if installed; then
+        echo "emulator and system image installed (attempt $attempt)"
+        exit 0
+    fi
+    echo "attempt $attempt of $ATTEMPTS did not leave a usable emulator and system image" >&2
+    rm -rf "$ANDROID_HOME/emulator" "$IMAGE_DIR"
+    if [ "$attempt" -lt "$ATTEMPTS" ]; then sleep 10; fi
+done
+
+echo "could not install the emulator and system image after $ATTEMPTS attempts" >&2
+exit 1
