@@ -280,7 +280,14 @@ func redialTargets(selfID peer.ID, bootstrap []string, machinePeerIDs []string) 
 // its own timeout, and waits for all of them. It clears each target's dial
 // backoff first, because failures on the old network would otherwise block
 // the dial; relay addresses stay in play, since on mobile data a relay may be
-// the only path. It returns how many it dialled and how many connected.
+// the only path. A target reached only through a relay is dialled once more,
+// directly. Such a dial can end on a relayed connection when it joins a dial
+// to the same peer that started before the network was usable: that dial
+// keeps the error of the direct address and waits for the relay. edgevpn opens
+// its VPN streams without allowing relayed connections, so libp2p holds them
+// until a direct connection exists, and without the second dial traffic to
+// that peer stops until something else dials it directly. The relayed connection stays when the direct dial fails. It
+// returns how many it dialled and how many connected.
 func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled, connected int) {
 	var wg sync.WaitGroup
 	var countMu sync.Mutex
@@ -297,13 +304,39 @@ func redial(ctx context.Context, h host.Host, targets []peer.AddrInfo) (dialled,
 			}
 			dctx, cancel := context.WithTimeout(ctx, redialTimeout)
 			defer cancel()
-			if h.Connect(dctx, t) == nil {
-				countMu.Lock()
-				connected++
-				countMu.Unlock()
+			if h.Connect(dctx, t) != nil {
+				return
 			}
+			if onlyLimited(h.Network().ConnsToPeer(t.ID)) {
+				if sw, ok := h.Network().(*swarm.Swarm); ok {
+					sw.Backoff().Clear(t.ID)
+				}
+				err := h.Connect(network.WithForceDirectDial(dctx, "relayed after a network change"), t)
+				emit("DEBUG", fmt.Sprintf("redial: %s was reached only through a relay; direct dial: %v", t.ID, errOrOK(err)))
+			}
+			countMu.Lock()
+			connected++
+			countMu.Unlock()
 		}(t)
 	}
 	wg.Wait()
 	return dialled, connected
+}
+
+// onlyLimited reports whether conns is not empty and every one of them is
+// limited, as a relayed connection is.
+func onlyLimited(conns []network.Conn) bool {
+	for _, c := range conns {
+		if !c.Stat().Limited {
+			return false
+		}
+	}
+	return len(conns) > 0
+}
+
+func errOrOK(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return "ok"
 }
