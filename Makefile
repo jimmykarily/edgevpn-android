@@ -155,6 +155,7 @@ release: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 # module links against it.
 test: $(GOLIB_AAR) | $(GRADLE) $(SDK_STAMP)
 	python3 -I scripts/scrub-key --self-test
+	python3 -I scripts/vpn-routes --self-test
 	cd golib && go test ./...
 	@echo "sdk.dir=$(ANDROID_HOME)" > local.properties
 	$(GRADLE) -p $(CURDIR) testDebugUnitTest

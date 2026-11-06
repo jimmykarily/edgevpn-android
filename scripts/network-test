@@ -219,14 +219,7 @@ listen_sockets() {
 # "10.1.0.0/24 -> 0.0.0.0 tun0 mtu 0".
 vpn_routes() {
     adb_ shell dumpsys connectivity | tr -d '\r' | scrub >"$OUT/connectivity.txt"
-    python3 -I -c '
-import re, sys
-for line in open(sys.argv[1], errors="replace"):
-    if "NetworkAgentInfo" in line and re.search(r"extra: VPN:" + re.escape(sys.argv[2]) + r"(\}|\s)", line):
-        m = re.search(r"Routes: \[([^\]]*)\]", line)
-        if m:
-            print("\n".join(r.strip() for r in m.group(1).split(",")))
-' "$OUT/connectivity.txt" "$PACKAGE"
+    python3 -I "$ROOT/scripts/vpn-routes" "$OUT/connectivity.txt" "$PACKAGE" "$APP_ADDRESS"
 }
 
 # Fails when the VPN network has an unreachable IPv6 default route, which
