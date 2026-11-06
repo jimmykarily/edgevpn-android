@@ -28,9 +28,6 @@ data class DeviceRow(
     val openSeconds: Long?,
 )
 
-/** The other device that holds this phone's address. A null [name] shows as "Unnamed device". */
-data class AddressInUse(val id: String, val name: String?)
-
 data class StatusModel(
     val state: VpnState,
     val reachable: Int,
@@ -47,8 +44,8 @@ data class StatusModel(
     val failedSecondsAgo: Long? = null,
     /** The raw error behind [error], for the Problem help sheet only. */
     val detail: String? = null,
-    /** Set when another device holds this phone's address, which keeps this phone out of the device list. */
-    val addressInUse: AddressInUse? = null,
+    /** True while another device claims this phone's address, which keeps this phone out of the device list. */
+    val addressInUse: Boolean = false,
 )
 
 sealed interface Ago {
@@ -76,9 +73,6 @@ private fun parseState(s: String) = when (s) {
 
 private fun nonEmpty(s: String): String? = s.ifEmpty { null }
 
-/** A device name, or null when the device announced nothing useful. */
-private fun deviceName(s: String): String? = if (s.isEmpty() || s == "localhost") null else s
-
 private fun parseDevice(o: JSONObject, now: Long): DeviceRow {
     val badge = when (o.optString("reach")) {
         "direct" -> Badge.DIRECT
@@ -91,11 +85,11 @@ private fun parseDevice(o: JSONObject, now: Long): DeviceRow {
         Badge.VIA_HELPER -> How.ThroughHelper
         Badge.OFFLINE -> if (lastSeen > 0) How.LastSeen(now - lastSeen) else How.NotReachable
     }
-    val name = deviceName(o.optString("name"))
+    val name = o.optString("name")
     val openedAt = o.optLong("openedAt", 0)
     return DeviceRow(
         id = o.optString("id"),
-        name = name,
+        name = if (name.isEmpty() || name == "localhost") null else name,
         address = o.optString("address"),
         badge = badge,
         how = how,
@@ -134,8 +128,6 @@ fun parseStatus(json: String, nowSeconds: Long): StatusModel {
         selfName = self?.optString("name") ?: "",
         failedSecondsAgo = root.optLong("failedAt", 0).takeIf { it > 0 }?.let { maxOf(0L, nowSeconds - it) },
         detail = nonEmpty(root.optString("detail")),
-        addressInUse = root.optJSONObject("addressInUse")?.let {
-            AddressInUse(id = it.optString("id"), name = deviceName(it.optString("name")))
-        },
+        addressInUse = root.optBoolean("addressInUse"),
     )
 }

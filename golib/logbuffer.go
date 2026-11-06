@@ -169,8 +169,13 @@ func (l *bufferLogger) Debugf(f string, args ...interface{}) { emit("DEBUG", fmt
 func (l *bufferLogger) Info(args ...interface{})             { emit("INFO ", joinArgs(args...)) }
 func (l *bufferLogger) Infof(f string, args ...interface{})  { emit("INFO ", fmt.Sprintf(f, args...)) }
 func (l *bufferLogger) Warn(args ...interface{})             { emit("WARN ", joinArgs(args...)) }
-func (l *bufferLogger) Warnf(f string, args ...interface{})  { emit("WARN ", fmt.Sprintf(f, args...)) }
-func (l *bufferLogger) Warning(args ...interface{})          { emit("WARN ", joinArgs(args...)) }
+func (l *bufferLogger) Warnf(f string, args ...interface{}) {
+	if f == violationRejectedFormat {
+		recordRejection(args)
+	}
+	emit("WARN ", fmt.Sprintf(f, args...))
+}
+func (l *bufferLogger) Warning(args ...interface{}) { emit("WARN ", joinArgs(args...)) }
 func (l *bufferLogger) Warningf(f string, args ...interface{}) {
 	emit("WARN ", fmt.Sprintf(f, args...))
 }

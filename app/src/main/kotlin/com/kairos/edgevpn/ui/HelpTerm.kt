@@ -105,11 +105,7 @@ fun liveValues(
         }
         HelpTerm.DETAILED_LOGS -> add("Detailed logs", phone.detailedLogs?.let { if (it) "On" else "Off" })
         HelpTerm.PHONE_ID -> add("Phone ID", model.selfId)
-        HelpTerm.ADDRESS_IN_USE -> {
-            add("Address", model.selfAddress)
-            add("Used by", model.addressInUse?.name)
-            add("Their device ID", model.addressInUse?.id)
-        }
+        HelpTerm.ADDRESS_IN_USE -> add("Address", model.selfAddress)
         HelpTerm.OFF, HelpTerm.FINDING, HelpTerm.NETWORK_KEY, HelpTerm.START_FRESH -> Unit
     }
     return out
