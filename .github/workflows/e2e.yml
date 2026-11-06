@@ -101,6 +101,16 @@ jobs:
             ~/.android/adb*
           key: android-avd-35-default-x86_64-disk2g-pixel6-clean
 
+      # The emulator writes lock files into the device directory that hold
+      # its process ID, such as snapshot.lock.lock, and can leave them behind
+      # when it is killed, so the cached device carries them. On a new runner
+      # the emulator treats a lock as held when any live process has that ID,
+      # and exits with "A snapshot operation for 'test' is pending and timeout
+      # has expired". Nothing runs the device at this point, so every lock in
+      # it is stale.
+      - name: Remove stale emulator locks from the cached device
+        run: if [ -d ~/.android/avd ]; then find ~/.android/avd -name '*.lock' -type f -print -delete; fi
+
       # The slow part, done before an emulator is running: the Go library for
       # the phone and the x86_64 emulator, the app and the test APK. This
       # also installs the SDK that the emulator runner below needs.
@@ -160,6 +170,10 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "Device created and snapshotted for the cache."
+
+      - name: Remove emulator locks before caching the device
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        run: if [ -d ~/.android/avd ]; then find ~/.android/avd -name '*.lock' -type f -print -delete; fi
 
       - name: Save the device and its snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
