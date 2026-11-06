@@ -264,3 +264,60 @@ func TestSnapshotSkipsTheHostUntilItIsReady(t *testing.T) {
 		t.Errorf("devices = %+v, want the ledger device offline", got.Devices)
 	}
 }
+
+func TestSnapshotReportsAnotherPeerAtThisPhonesAddress(t *testing.T) {
+	snap := buildSnapshot(snapshotInput{
+		State:       "looking",
+		SelfID:      "self",
+		SelfAddress: "10.1.0.2",
+		Machines: []types.Machine{
+			{PeerID: "emulator", Address: "10.1.0.2", Hostname: "emulator"},
+			{PeerID: "desktop", Address: "10.1.0.1", Hostname: "desktop"},
+		},
+	})
+	want := &addressInUseJSON{ID: "emulator", Name: "emulator"}
+	if snap.AddressInUse == nil || *snap.AddressInUse != *want {
+		t.Fatalf("addressInUse = %+v, want %+v", snap.AddressInUse, want)
+	}
+	raw, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"addressInUse":{"id":"emulator","name":"emulator"}`) {
+		t.Fatalf("snapshot = %s", raw)
+	}
+}
+
+func TestSnapshotLeavesOutAddressInUseWithoutAnotherPeerAtTheAddress(t *testing.T) {
+	cases := map[string]snapshotInput{
+		"our own entry": {
+			SelfID: "self", SelfAddress: "10.1.0.2",
+			Machines: []types.Machine{{PeerID: "self", Address: "10.1.0.2", Hostname: "phone"}},
+		},
+		"no entry at the address": {
+			SelfID: "self", SelfAddress: "10.1.0.2",
+			Machines: []types.Machine{{PeerID: "desktop", Address: "10.1.0.1", Hostname: "desktop"}},
+		},
+		"own ID not known yet": {
+			SelfAddress: "10.1.0.2",
+			Machines:    []types.Machine{{PeerID: "emulator", Address: "10.1.0.2", Hostname: "emulator"}},
+		},
+		"own address not known": {
+			SelfID:   "self",
+			Machines: []types.Machine{{PeerID: "emulator", Address: "", Hostname: "emulator"}},
+		},
+	}
+	for name, in := range cases {
+		snap := buildSnapshot(in)
+		if snap.AddressInUse != nil {
+			t.Errorf("%s: addressInUse = %+v, want none", name, snap.AddressInUse)
+		}
+		raw, err := json.Marshal(snap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), "addressInUse") {
+			t.Errorf("%s: snapshot has addressInUse: %s", name, raw)
+		}
+	}
+}

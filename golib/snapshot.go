@@ -42,6 +42,14 @@ type lastHeardJSON struct {
 	Name string `json:"name"`
 }
 
+// addressInUseJSON names the other device whose machines entry holds this
+// phone's address. The ledger lets only that entry's owner write it, so
+// this phone stays out of the shared device list until one of the two moves.
+type addressInUseJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type snapshotJSON struct {
 	State     string         `json:"state"`
 	StartedAt int64          `json:"startedAt"`
@@ -52,6 +60,9 @@ type snapshotJSON struct {
 	Devices   []deviceJSON   `json:"devices"`
 	Helpers   int            `json:"helpers"`
 	LastHeard *lastHeardJSON `json:"lastHeard,omitempty"`
+	// AddressInUse is set when another peer owns the machines entry at
+	// this phone's address.
+	AddressInUse *addressInUseJSON `json:"addressInUse,omitempty"`
 }
 
 // snapshotInput is everything buildSnapshot needs, gathered by the caller.
@@ -95,6 +106,10 @@ func buildSnapshot(in snapshotInput) snapshotJSON {
 	machines := append([]types.Machine(nil), in.Machines...)
 	sort.SliceStable(machines, func(i, j int) bool { return machines[i].Address < machines[j].Address })
 	for _, m := range machines {
+		if snap.AddressInUse == nil && in.SelfID != "" && in.SelfAddress != "" &&
+			m.Address == in.SelfAddress && m.PeerID != "" && m.PeerID != in.SelfID {
+			snap.AddressInUse = &addressInUseJSON{ID: m.PeerID, Name: m.Hostname}
+		}
 		if m.PeerID == "" || (in.SelfID != "" && m.PeerID == in.SelfID) ||
 			(in.SelfAddress != "" && m.Address == in.SelfAddress) || deviceIDs[m.PeerID] {
 			continue
