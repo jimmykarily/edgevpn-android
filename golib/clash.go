@@ -19,6 +19,11 @@ const addressInUseWindow = 60 * time.Second
 // key, the writer's peer ID and the reason.
 const violationRejectedFormat = "ownership violation (rejected): %s/%s from %s: %s"
 
+// rejectedClaimReason is the reason edgevpn gives when another peer tries
+// to take an entry this node holds as live. The other reasons are about
+// deletions and bad signatures, which say nothing about a shared address.
+const rejectedClaimReason = "overwrite of a live entry owned by another peer"
+
 // clock is the time source for recording rejected writes; tests replace it.
 var clock = time.Now
 
@@ -38,16 +43,18 @@ func rejectedAt(addr string) time.Time {
 }
 
 // recordRejection notes a rejected write from the arguments of a warning
-// logged with violationRejectedFormat. Only machines entries count. It
+// logged with violationRejectedFormat. Only another peer's claim on a
+// machines entry counts. It
 // takes its own lock, never mu, because the ledger calls it with the
 // ledger's lock held.
 func recordRejection(args []interface{}) {
-	if len(args) < 2 {
+	if len(args) < 4 {
 		return
 	}
 	bucket, ok1 := args[0].(string)
 	key, ok2 := args[1].(string)
-	if !ok1 || !ok2 || bucket != protocol.MachinesLedgerKey {
+	reason, ok3 := args[3].(string)
+	if !ok1 || !ok2 || !ok3 || bucket != protocol.MachinesLedgerKey || reason != rejectedClaimReason {
 		return
 	}
 	rejectedMu.Lock()
