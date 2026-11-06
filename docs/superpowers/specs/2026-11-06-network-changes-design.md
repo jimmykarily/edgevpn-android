@@ -104,7 +104,9 @@ Each step fails above 60 seconds and logs the measured time. 60 seconds is loose
 
 A test of a Wi-Fi network without internet needs a second Wi-Fi network on the emulator, which it does not have. It stays for the phone.
 
-## Open questions for the owner
+## Decisions
 
-- The 10 second keepalive is a guess at the right trade between noticing drops and battery. Fine to start there and let step 8 tune it?
-- `NetworkChanged` turns mDNS off on mobile data. Is there a case where you want mDNS on mobile data (for example a USB or Bluetooth tethered setup)?
+Approved by the owner on 2026-11-06, with these answers:
+
+- The keepalive starts at 10 seconds; step 8 tunes it with battery measurements.
+- No mDNS on mobile data, tethered setups included.
