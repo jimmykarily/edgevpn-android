@@ -44,9 +44,8 @@ func rejectedAt(addr string) time.Time {
 
 // recordRejection notes a rejected write from the arguments of a warning
 // logged with violationRejectedFormat. Only another peer's claim on a
-// machines entry counts. It
-// takes its own lock, never mu, because the ledger calls it with the
-// ledger's lock held.
+// machines entry counts. It takes its own lock, never mu, because the
+// ledger calls it with the ledger's lock held.
 func recordRejection(args []interface{}) {
 	if len(args) < 4 {
 		return

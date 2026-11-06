@@ -52,6 +52,24 @@ func TestStopForgetsRejectedEntries(t *testing.T) {
 	}
 }
 
+func TestStartForgetsRejectedEntries(t *testing.T) {
+	fixClock(t, time.Unix(1793890000, 0))
+	t.Cleanup(func() { Stop(); ClearLogs() })
+	key, err := GenerateNodeKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	(&bufferLogger{}).Warnf(violationRejectedFormat, protocol.MachinesLedgerKey, "10.1.0.2", "p", rejectedClaimReason)
+	// fd -1 makes Start fail right after it has reset the session state, so
+	// no node runs and Stop is not involved.
+	if err := Start(-1, "some-token", key, "10.1.0.2", "test"); err == nil {
+		t.Fatal("Start succeeded with fd -1")
+	}
+	if got := rejectedAt("10.1.0.2"); !got.IsZero() {
+		t.Fatalf("rejectedAt after Start = %v", got)
+	}
+}
+
 func testSigner(t *testing.T) blockchain.Signer {
 	t.Helper()
 	priv, _, err := crypto.GenerateKeyPair(crypto.Ed25519, 0)
@@ -135,13 +153,23 @@ func TestLedgerRejectionOfAnotherPeersEntryIsRecorded(t *testing.T) {
 // that side's deletion of the entry and rejects it. That is no clash.
 func TestLedgerRejectionOfADeletionIsNotRecorded(t *testing.T) {
 	fixClock(t, time.Unix(1793890000, 0))
-	phone, _, peer, peerSigner, out := twoLedgers(t)
+	phone, phoneSigner, peer, peerSigner, out := twoLedgers(t)
 	peer.Add(protocol.MachinesLedgerKey, map[string]interface{}{
 		"10.1.0.4": types.Machine{PeerID: peerSigner.ID(), Address: "10.1.0.4", Hostname: "testpeer"},
 	})
 	peer.Delete(protocol.MachinesLedgerKey, "10.1.0.4")
 	deliver(t, out, phone)
 
+	// The phone's entry is still there and its own, so the deletion was
+	// rejected and not merely missed.
+	var m types.Machine
+	v, found := phone.GetKey(protocol.MachinesLedgerKey, "10.1.0.4")
+	if !found {
+		t.Fatal("the phone's entry at 10.1.0.4 was deleted")
+	}
+	if err := v.Unmarshal(&m); err != nil || m.PeerID != phoneSigner.ID() {
+		t.Fatalf("the phone's entry = %+v (%v), want its own", m, err)
+	}
 	if got := rejectedAt("10.1.0.4"); !got.IsZero() {
 		t.Fatalf("a rejected deletion was recorded as a clash at %v", got)
 	}

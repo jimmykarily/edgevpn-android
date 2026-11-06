@@ -399,8 +399,9 @@ restore_network() {
 }
 
 # The basic scenario has one device per address, so the warning that
-# another device uses the app's address must never be on screen. A rejected
-# deletion of the app's old entry after off and on once showed it.
+# another device uses the app's address must never be on screen. After off
+# and on the app rejects the peer's deletion of its old entry, which must
+# not count as a clash.
 no_address_warning() {
     if on_screen "Another device already uses $APP_ADDRESS. Pick another address in Settings."; then
         shot address-warning
