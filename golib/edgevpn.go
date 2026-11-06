@@ -256,6 +256,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancelFn = cancel
+	sessionCtx = ctx
 	currentNode = n
 	currentMDNS = newMDNSRunner(mdnsTag(normalizeToken(token)))
 	hostReady = false
@@ -294,6 +295,8 @@ func handleNodeExit(n *node.Node, cancel context.CancelFunc, err error) {
 		}
 		currentNode = nil
 		cancelFn = nil
+		sessionCtx = nil
+		netChangeNode = nil
 		hostReady = false
 		fail(reasonStopped, fmt.Sprintf("node.Start returned error: %v", err))
 	}
@@ -338,6 +341,9 @@ func Stop() {
 	failureDetail = ""
 	failedAt = time.Time{}
 	currentNode = nil
+	sessionCtx = nil
+	netChangeNode = nil
+	debouncer := netChange
 	runner := currentMDNS
 	currentMDNS = nil
 	startedAt = time.Time{}
@@ -351,6 +357,7 @@ func Stop() {
 		tunFile = nil
 	}
 	mu.Unlock()
+	debouncer.stop()
 	if runner != nil {
 		runner.stop()
 	}

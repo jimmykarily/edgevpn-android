@@ -1,6 +1,7 @@
 package edgevpn
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -27,6 +28,10 @@ var (
 	// libp2p host. Before that, Node.Host is written by the node goroutine
 	// without synchronization and must not be read.
 	hostReady bool
+	// sessionCtx is the current session's context; Stop cancels it.
+	sessionCtx context.Context
+	// netChangeNode is the session of the last NetworkChanged call.
+	netChangeNode *node.Node
 )
 
 // StatusListener is told when the VPN stops without Stop being called.
