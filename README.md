@@ -75,7 +75,7 @@ The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `an
 
 ## Screen tests
 
-The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
+The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, the warning when another device uses the phone's address, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
 
 ```bash
 make emu-up   # start the emulator, once
@@ -96,7 +96,7 @@ Real-network checks need a second device in the network. `scripts/testpeer` runs
 | `make peer-down` | Stop the VM and delete the run directory, including the key |
 | `make peer-status` | Whether the VM and edgevpn are running, and the VPN interface |
 
-`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `serial` (its console log), `scrub` (stdin to stdout without the key), `key` (the path of the key file, never its contents) and `addr` (the VM's libp2p address as the emulator reaches it).
+`scripts/testpeer` also has `ping <addr>` (ping from inside the VM), `logs` (the VM's edgevpn log), `serial` (its console log), `scrub` (stdin to stdout without the key), `key` (the path of the key file, never its contents), `addr` (the VM's libp2p address as the emulator reaches it) and `readdress <addr>` (restart edgevpn in the VM with another VPN address).
 
 The first `up` downloads the cloud image and builds edgevpn at the version `golib/go.mod` requires, both into `binaries/testpeer/`. Each run boots from a fresh overlay disk and generates its own key into `binaries/testpeer/run/token`; the owner's network key is never used. edgevpn in the VM runs with an ownership TTL of 60 seconds instead of the default 8 minutes, so it forgets a device that has been silent for about a minute. The host forwards `127.0.0.1:40022` to the VM's SSH and `127.0.0.1:40001` to its libp2p port (override with `TESTPEER_SSH_PORT` and `TESTPEER_P2P_PORT`).
 
@@ -115,7 +115,9 @@ It writes screenshots, the app's log and the peer's edgevpn and console logs int
 
 The test also guards the app's calls to `VpnService.protect`, which keeps the app's own sockets out of the VPN. They run on the dialing thread. In the network test runs protect never failed off the main thread on an API 35 emulator; vendor phone builds are untested. The script enlarges the emulator's log buffer and fails if the app logged `VpnService.protect(...) returned false`, once after the first connect and once at the end. That log line is also the sign to look for on a real phone.
 
-The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
+`make network-test-address-in-use` uses the same setup and then checks the warning about a shared address. Before the app turns on, the peer moves to the app's address `10.1.0.4` (`scripts/testpeer readdress`, which restarts edgevpn in the VM and so empties its ledger) and waits until it lists itself there. The app, turned on afterwards, must show "Another device already uses 10.1.0.4. Pick another address in Settings." while still looking for devices, and its "Change address" button must open Settings. The peer gets `10.1.0.10` back at the end when the test did not start it. Its files go into `build/network-test/address-in-use/`.
+
+The **Network tests** workflow (`.github/workflows/network.yml`) runs `make network-test` and then `make network-test-address-in-use` on every pull request and every push to `main`, and uploads `build/network-test/` when it fails. It uses no secrets.
 
 ## Auto-downloaded tools
 

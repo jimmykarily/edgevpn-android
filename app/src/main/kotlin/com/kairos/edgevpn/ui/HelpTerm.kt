@@ -3,7 +3,8 @@ package com.kairos.edgevpn.ui
 /** One term the app explains with a (?) help sheet, one per row of the glossary. */
 enum class HelpTerm {
     CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, YOUR_DEVICES, DIRECT, VIA_HELPER, OFFLINE,
-    SAME_NETWORK, FINDING, HELPERS, LAST_HEARD, NETWORK_KEY, NAME, ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH;
+    SAME_NETWORK, FINDING, HELPERS, LAST_HEARD, NETWORK_KEY, NAME, ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH,
+    ADDRESS_IN_USE;
 
     /** What the live values of this term describe, which names their heading in the sheet. */
     val liveScope: LiveScope
@@ -11,7 +12,7 @@ enum class HelpTerm {
             DIRECT, VIA_HELPER, OFFLINE, SAME_NETWORK -> LiveScope.CONNECTION
             YOUR_DEVICES, LAST_HEARD -> LiveScope.NETWORK
             CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, FINDING, HELPERS, NETWORK_KEY, NAME,
-            ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH -> LiveScope.PHONE
+            ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH, ADDRESS_IN_USE -> LiveScope.PHONE
         }
 
     /**
@@ -104,6 +105,7 @@ fun liveValues(
         }
         HelpTerm.DETAILED_LOGS -> add("Detailed logs", phone.detailedLogs?.let { if (it) "On" else "Off" })
         HelpTerm.PHONE_ID -> add("Phone ID", model.selfId)
+        HelpTerm.ADDRESS_IN_USE -> add("Address", model.selfAddress)
         HelpTerm.OFF, HelpTerm.FINDING, HelpTerm.NETWORK_KEY, HelpTerm.START_FRESH -> Unit
     }
     return out

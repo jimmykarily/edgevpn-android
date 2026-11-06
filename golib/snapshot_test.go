@@ -264,3 +264,45 @@ func TestSnapshotSkipsTheHostUntilItIsReady(t *testing.T) {
 		t.Errorf("devices = %+v, want the ledger device offline", got.Devices)
 	}
 }
+
+func TestSnapshotAddressInUseWhileTheLastRejectionIsRecent(t *testing.T) {
+	now := time.Unix(1793890000, 0)
+	cases := []struct {
+		name       string
+		rejectedAt time.Time
+		want       bool
+	}{
+		{"just now", now, true},
+		{"59 seconds ago", now.Add(-59 * time.Second), true},
+		{"60 seconds ago", now.Add(-60 * time.Second), false},
+		{"never", time.Time{}, false},
+	}
+	for _, c := range cases {
+		snap := buildSnapshot(snapshotInput{
+			State: "looking", Now: now, SelfID: "self", SelfAddress: "10.1.0.2", AddressRejectedAt: c.rejectedAt,
+		})
+		if snap.AddressInUse != c.want {
+			t.Errorf("%s: addressInUse = %v, want %v", c.name, snap.AddressInUse, c.want)
+		}
+		raw, err := json.Marshal(snap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(raw), `"addressInUse":true`); got != c.want {
+			t.Errorf("%s: snapshot = %s", c.name, raw)
+		}
+		if !c.want && strings.Contains(string(raw), "addressInUse") {
+			t.Errorf("%s: snapshot has addressInUse: %s", c.name, raw)
+		}
+	}
+}
+
+func TestSnapshotIgnoresAnotherPeersEntryAtThisPhonesAddressInItsOwnLedger(t *testing.T) {
+	snap := buildSnapshot(snapshotInput{
+		SelfID: "self", SelfAddress: "10.1.0.2",
+		Machines: []types.Machine{{PeerID: "emulator", Address: "10.1.0.2", Hostname: "emulator"}},
+	})
+	if snap.AddressInUse {
+		t.Fatal("addressInUse comes from rejected writes, not from the local ledger")
+	}
+}

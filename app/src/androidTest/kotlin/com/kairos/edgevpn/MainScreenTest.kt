@@ -3,6 +3,7 @@ package com.kairos.edgevpn
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
@@ -120,6 +121,42 @@ class MainScreenTest {
                     )
                 )
             )
+        }
+    }
+
+    @Test
+    fun anotherDeviceAtThisAddressShowsTheWarningWithHelpAndChangeAddress() {
+        snapshot = Snapshots.lookingWithAddressInUse()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.statusTitle)).check(matches(withTextBeforeHelpIcon("Looking for your devices")))
+            onView(withId(R.id.addressInUseText)).check(
+                matches(
+                    allOf(
+                        isDisplayed(),
+                        withTextBeforeHelpIcon("Another device already uses 10.1.0.2. Pick another address in Settings."),
+                    )
+                )
+            )
+
+            onView(withId(R.id.addressInUseText)).perform(clickHelpIcon())
+            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Address already in use"))))
+            onView(withId(R.id.helpLive)).perform(nestedScrollTo())
+                .check(matches(withText(containsString("Address: 10.1.0.2"))))
+            pressBack()
+
+            onView(withId(R.id.changeAddressButton)).check(matches(allOf(isDisplayed(), withText("Change address"))))
+                .perform(click())
+            onView(withId(R.id.detailedLogsSwitch)).perform(nestedScrollTo()).check(matches(isDisplayed()))
+            pressBack()
+        }
+    }
+
+    @Test
+    fun noWarningWhenNoOtherDeviceHoldsTheAddress() {
+        snapshot = Snapshots.connectedWithThreeDevices()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.addressInUseText)).check(matches(not(isDisplayed())))
+            onView(withId(R.id.changeAddressButton)).check(matches(not(isDisplayed())))
         }
     }
 }

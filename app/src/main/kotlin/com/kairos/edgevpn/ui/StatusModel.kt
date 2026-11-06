@@ -44,6 +44,8 @@ data class StatusModel(
     val failedSecondsAgo: Long? = null,
     /** The raw error behind [error], for the Problem help sheet only. */
     val detail: String? = null,
+    /** True while another device claims this phone's address, which keeps this phone out of the device list. */
+    val addressInUse: Boolean = false,
 )
 
 sealed interface Ago {
@@ -126,5 +128,6 @@ fun parseStatus(json: String, nowSeconds: Long): StatusModel {
         selfName = self?.optString("name") ?: "",
         failedSecondsAgo = root.optLong("failedAt", 0).takeIf { it > 0 }?.let { maxOf(0L, nowSeconds - it) },
         detail = nonEmpty(root.optString("detail")),
+        addressInUse = root.optBoolean("addressInUse"),
     )
 }

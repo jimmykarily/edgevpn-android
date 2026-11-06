@@ -21,6 +21,8 @@ data class ScreenPlan(
     val showSeeLogs: Boolean,
     /** Connected with exactly one device, which reads "You can reach your device." */
     val onlyDevice: Boolean,
+    /** The warning on the status card that another device uses this phone's address. */
+    val showAddressInUse: Boolean,
 )
 
 fun planScreen(m: StatusModel): ScreenPlan {
@@ -46,6 +48,7 @@ fun planScreen(m: StatusModel): ScreenPlan {
         secondTile = secondTile,
         showSeeLogs = m.state == VpnState.PROBLEM,
         onlyDevice = m.state == VpnState.CONNECTED && m.total == 1,
+        showAddressInUse = running && m.addressInUse && m.selfAddress.isNotEmpty(),
     )
 }
 
