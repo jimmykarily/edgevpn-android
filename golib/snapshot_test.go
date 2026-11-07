@@ -341,3 +341,15 @@ func TestSetLocalNetworkClashReachesTheSnapshotUntilStop(t *testing.T) {
 		t.Fatal("the clash outlived Stop")
 	}
 }
+
+func TestOnlyDirectDevicesCountAsReachable(t *testing.T) {
+	// edgevpn sends no VPN traffic over a relayed connection, so a device
+	// reached only through a relay must not make the phone "connected".
+	devices := []deviceJSON{{Reach: "direct"}, {Reach: "helper"}, {Reach: "offline"}}
+	if got := reachableCount(devices); got != 1 {
+		t.Errorf("reachableCount = %d, want 1", got)
+	}
+	if got := reachableCount([]deviceJSON{{Reach: "helper"}}); got != 0 {
+		t.Errorf("a relayed-only device counted as reachable: %d", got)
+	}
+}

@@ -117,7 +117,8 @@ fun parseStatus(json: String, nowSeconds: Long): StatusModel {
     val heard = root.optJSONObject("lastHeard")
     return StatusModel(
         state = parseState(root.optString("state")),
-        reachable = devices.count { it.badge != Badge.OFFLINE },
+        // No VPN traffic flows through a helper, so only direct devices count.
+        reachable = devices.count { it.badge == Badge.DIRECT },
         total = devices.size,
         selfAddress = self?.optString("address") ?: "",
         selfId = self?.optString("id") ?: "",

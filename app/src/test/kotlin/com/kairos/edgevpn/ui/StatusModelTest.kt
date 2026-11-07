@@ -41,14 +41,15 @@ class StatusModelTest {
     }
 
     @Test
-    fun countsReachableAndTotal() {
+    fun countsOnlyDirectDevicesAsReachable() {
         val m = parseStatus(
             snapshot(
                 listOf(device("1", "a", "direct"), device("2", "b", "helper"), device("3", "c", "offline")).joinToString(","),
             ),
             1000,
         )
-        assertEquals(2, m.reachable)
+        // No VPN traffic flows through a helper, so only the direct device counts.
+        assertEquals(1, m.reachable)
         assertEquals(3, m.total)
     }
 

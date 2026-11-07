@@ -102,7 +102,7 @@
     <string name="map_more">more</string>
     <string name="map_more_count">+%1$d</string>
     <string name="legend_direct">direct</string>
-    <string name="legend_via_helper">via helper</string>
+    <string name="legend_via_helper">helper only, no traffic</string>
     <string name="legend_offline">offline</string>
     <string name="section_devices">Your devices</string>
     <string name="section_finding">Finding your devices</string>
@@ -120,11 +120,11 @@
     <string name="unnamed_device">Unnamed device</string>
     <string name="device_line">%1$s · %2$s</string>
     <string name="badge_direct">Direct</string>
-    <string name="badge_via_helper">Via helper</string>
+    <string name="badge_via_helper">Helper only</string>
     <string name="badge_offline">Offline</string>
     <string name="how_same_wifi">same Wi-Fi as you</string>
     <string name="how_over_internet">over the internet</string>
-    <string name="how_through_helper">through a helper computer</string>
+    <string name="how_through_helper">found through a helper, no traffic yet</string>
     <string name="how_last_seen">last seen %1$s</string>
     <string name="how_not_reachable">not reachable right now</string>
 
@@ -178,9 +178,9 @@
     <string name="help_direct_title">Direct</string>
     <string name="help_direct_plain">This phone and the device talk straight to each other. This is the fastest way.</string>
     <string name="help_direct_tech">At least one open libp2p connection to the peer is not relayed (no /p2p-circuit in the remote multiaddr) and not limited.</string>
-    <string name="help_via_helper_title">Via helper</string>
-    <string name="help_via_helper_plain">Your phone and the device can\'t reach each other directly, usually because both are behind a home router or a mobile network. Their traffic passes through another computer on the internet that offered to help. It works, but it is slower, and the helper may limit how long the connection lasts.</string>
-    <string name="help_via_helper_tech">The connection is a libp2p circuit relay v2 connection (the multiaddr contains /p2p-circuit). Relays usually limit these (default: 2 minutes, 128 KiB). libp2p tries hole punching (DCUtR) to upgrade to a direct connection.</string>
+    <string name="help_via_helper_title">Helper only</string>
+    <string name="help_via_helper_plain">Your phone and this device found each other through another computer on the internet that offered to help, but they can\'t reach each other directly yet, usually because both are behind a home router or a mobile network. The VPN sends nothing through helpers, so no traffic passes between the two until they open a direct path. They keep trying while the VPN is on.</string>
+    <string name="help_via_helper_tech">The only connections are libp2p circuit relay v2 connections (limited; the multiaddr contains /p2p-circuit). edgevpn opens its VPN and ledger streams without allowing limited connections, so libp2p waits for a direct connection from hole punching (DCUtR) or connection reversal, for up to the 15 s frame timeout, and drops the packet when none appears. Public relays also limit these connections (default: 2 minutes, 128 KiB).</string>
     <string name="help_offline_title">Offline</string>
     <string name="help_offline_plain">The device is in your network but can\'t be reached right now. It may be switched off or without internet.</string>
     <string name="help_offline_tech">The peer is in the machines ledger but there is no open libp2p connection to it. \"Last seen\" comes from its last health check in the ledger.</string>
@@ -191,7 +191,7 @@
     <string name="help_finding_plain">How well this phone can find your devices on the internet.</string>
     <string name="help_finding_tech">Discovery uses the public libp2p DHT (Kademlia) and, on Wi-Fi, mDNS.</string>
     <string name="help_helpers_title">Public helpers</string>
-    <string name="help_helpers_plain">Other computers on the internet this phone is talking to. They help your devices find each other and can pass traffic along when a direct connection is impossible.</string>
+    <string name="help_helpers_plain">Other computers on the internet this phone is talking to. They help your devices find each other and set up direct connections. Your VPN traffic never passes through them.</string>
     <string name="help_helpers_tech">Number of connected libp2p peers that are not machines of the network: DHT servers, relays and bootstrap nodes.</string>
     <string name="help_last_heard_title">Last heard from your network</string>
     <string name="help_last_heard_plain">How long ago any of your devices last checked in.</string>
