@@ -143,6 +143,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	failedAt = time.Time{}
 	selfAddress = address
 	selfName = name
+	localNetworkClash = false
 	forgetRejectedEntries()
 
 	tunFile = os.NewFile(uintptr(fd), "tun")
@@ -350,6 +351,7 @@ func Stop() {
 	hostReady = false
 	selfAddress = ""
 	selfName = ""
+	localNetworkClash = false
 	forgetRejectedEntries()
 	if tunFile != nil {
 		if err := tunFile.Close(); err != nil && !errors.Is(err, os.ErrClosed) {

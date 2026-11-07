@@ -34,7 +34,7 @@ class HelpTermTest {
 
     @Test
     fun oneTermPerGlossaryRow() {
-        assertEquals(21, HelpTerm.values().size)
+        assertEquals(22, HelpTerm.values().size)
     }
 
     @Test
@@ -119,6 +119,12 @@ class HelpTermTest {
     }
 
     @Test
+    fun localNetworkClashShowsTheVpnRoute() {
+        val clash = model.copy(localNetworkClash = true)
+        assertEquals(listOf("VPN route" to "10.1.0.0/24"), liveValues(HelpTerm.LOCAL_NETWORK_CLASH, clash, null))
+    }
+
+    @Test
     fun sameNetworkShowsTheRemoteAddress() {
         assertEquals(
             listOf("Remote address" to "192.168.1.20:4001"),
@@ -195,6 +201,7 @@ class HelpTermTest {
             HelpTerm.PHONE_ID to LiveScope.PHONE,
             HelpTerm.START_FRESH to LiveScope.PHONE,
             HelpTerm.ADDRESS_IN_USE to LiveScope.PHONE,
+            HelpTerm.LOCAL_NETWORK_CLASH to LiveScope.PHONE,
         )
         assertEquals(HelpTerm.values().toSet(), expected.keys)
         for (t in HelpTerm.values()) assertEquals(t.name, expected[t], t.liveScope)

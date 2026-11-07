@@ -199,9 +199,12 @@ class EdgeVpnService : VpnService() {
             mainHandler.postDelayed(statusTicker, TICK_MS)
             Log.i(TAG, "VPN started")
             val mySession = session
-            networkWatcher = UnderlyingNetworkWatcher(this) { network, local ->
-                onUnderlyingNetwork(mySession, network, local)
-            }.also { it.start() }
+            networkWatcher = UnderlyingNetworkWatcher(
+                this,
+                address,
+                onChange = { network, local -> onUnderlyingNetwork(mySession, network, local) },
+                onClash = { clash -> if (mySession == session && isRunning) Edgevpn.setLocalNetworkClash(clash) },
+            ).also { it.start() }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start VPN", e)
             failStart("The VPN could not start with this network key. The logs have the details.")

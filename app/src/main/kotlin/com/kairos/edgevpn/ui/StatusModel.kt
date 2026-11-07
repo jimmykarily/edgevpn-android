@@ -46,6 +46,8 @@ data class StatusModel(
     val detail: String? = null,
     /** True while another device claims this phone's address, which keeps this phone out of the device list. */
     val addressInUse: Boolean = false,
+    /** True while a Wi-Fi or Ethernet network the phone is on uses addresses in the VPN's range. */
+    val localNetworkClash: Boolean = false,
 )
 
 sealed interface Ago {
@@ -129,5 +131,6 @@ fun parseStatus(json: String, nowSeconds: Long): StatusModel {
         failedSecondsAgo = root.optLong("failedAt", 0).takeIf { it > 0 }?.let { maxOf(0L, nowSeconds - it) },
         detail = nonEmpty(root.optString("detail")),
         addressInUse = root.optBoolean("addressInUse"),
+        localNetworkClash = root.optBoolean("localNetworkClash"),
     )
 }

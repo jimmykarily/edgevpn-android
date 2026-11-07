@@ -150,4 +150,11 @@ class StatusModelTest {
         assertTrue(parseStatus(clash, 1000).addressInUse)
         assertFalse(parseStatus(snapshot(""), 1000).addressInUse)
     }
+
+    @Test
+    fun readsWhetherTheLocalNetworkUsesTheVpnRange() {
+        val clash = snapshot("", state = "looking").replace("\"helpers\":3", "\"helpers\":3,\"localNetworkClash\":true")
+        assertTrue(parseStatus(clash, 1000).localNetworkClash)
+        assertFalse(parseStatus(snapshot(""), 1000).localNetworkClash)
+    }
 }

@@ -49,6 +49,9 @@ object Snapshots {
     fun lookingWithAddressInUse(now: Long = now()): String =
         snapshot(state = "looking", startedAt = now - 40, helpers = 3).put("addressInUse", true).toString()
 
+    fun connectedOnAClashingWifi(now: Long = now()): String =
+        snapshot(state = "connected", startedAt = now - 40, helpers = 3).put("localNetworkClash", true).toString()
+
     fun problem(error: String, now: Long = now()): String =
         snapshot(state = "problem", error = error, failedAt = now - 20).toString()
 

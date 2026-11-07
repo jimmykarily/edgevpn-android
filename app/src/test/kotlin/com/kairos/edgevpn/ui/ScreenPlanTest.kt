@@ -18,10 +18,12 @@ class ScreenPlanTest {
         lastHeard: Long? = null,
         address: String = "10.1.0.2",
         addressInUse: Boolean = false,
+        localNetworkClash: Boolean = false,
     ) = StatusModel(
         state = state, reachable = devices.count { it.badge != Badge.OFFLINE }, total = devices.size,
         selfAddress = address, selfId = "me", runningSeconds = 40, error = null, devices = devices,
         helpers = 3, lastHeardSecondsAgo = lastHeard, lastHeardName = null, addressInUse = addressInUse,
+        localNetworkClash = localNetworkClash,
     )
 
     @Test
@@ -147,5 +149,15 @@ class ScreenPlanTest {
     @Test
     fun usingIsNullWithoutAnyNetworkWithInternet() {
         assertNull(pickUsing(listOf(net(vpn = true), net(internet = false, wifi = true))))
+    }
+
+    @Test
+    fun theLocalNetworkWarningShowsWhileRunningWhenTheRangesClash() {
+        assertTrue(planScreen(model(VpnState.LOOKING, localNetworkClash = true)).showLocalNetworkClash)
+        assertTrue(planScreen(model(VpnState.CONNECTED, localNetworkClash = true)).showLocalNetworkClash)
+        assertFalse(planScreen(model(VpnState.OFF, localNetworkClash = true)).showLocalNetworkClash)
+        assertFalse(planScreen(model(VpnState.PROBLEM, localNetworkClash = true)).showLocalNetworkClash)
+        assertFalse(planScreen(model(VpnState.CONNECTED)).showLocalNetworkClash)
+        assertFalse(planScreen(model(VpnState.LOOKING, address = "", localNetworkClash = true)).showLocalNetworkClash)
     }
 }
