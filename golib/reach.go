@@ -15,8 +15,9 @@ type connInfo struct {
 }
 
 // classifyReach reports how a device is reached: "direct" when at least one
-// connection goes peer to peer, "helper" when traffic only flows through a
-// relay, and "offline" when there is no connection. best is a copy of the
+// connection goes peer to peer, "helper" when the only connections go
+// through a relay (no VPN traffic flows over those, see reachableCount),
+// and "offline" when there is no connection. best is a copy of the
 // oldest direct connection, or of the oldest relayed one when no direct
 // connection exists, and nil when there are no connections.
 func classifyReach(conns []connInfo) (reach string, best *connInfo) {

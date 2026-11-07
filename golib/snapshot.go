@@ -228,14 +228,22 @@ func collectSnapshot() snapshotInput {
 	if n != nil {
 		readNetwork(n, ready, &in)
 	}
-	reachable := 0
-	for _, d := range buildSnapshot(in).Devices {
-		if d.Reach != "offline" {
-			reachable++
+	in.State = computeState(running, in.Failure, reachableCount(buildSnapshot(in).Devices))
+	return in
+}
+
+// reachableCount is the number of devices with a direct connection.
+// edgevpn opens VPN and ledger streams without allowing limited (relayed)
+// connections, so libp2p waits for a direct one and nothing flows to a
+// device reached only through a relay.
+func reachableCount(devices []deviceJSON) int {
+	n := 0
+	for _, d := range devices {
+		if d.Reach == "direct" {
+			n++
 		}
 	}
-	in.State = computeState(running, in.Failure, reachable)
-	return in
+	return n
 }
 
 // readNetwork fills in the ledger, connection and interface facts of a

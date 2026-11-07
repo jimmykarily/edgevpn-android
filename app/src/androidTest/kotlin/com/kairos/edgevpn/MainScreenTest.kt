@@ -76,11 +76,11 @@ class MainScreenTest {
         snapshot = Snapshots.connectedWithThreeDevices()
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withId(R.id.statusTitle)).check(matches(withTextBeforeHelpIcon("Connected")))
-            onView(withId(R.id.statusText)).check(matches(withText("You can reach 2 of your 3 devices.")))
+            onView(withId(R.id.statusText)).check(matches(withText("You can reach 1 of your 3 devices.")))
             onView(withId(R.id.deviceList)).perform(nestedScrollTo()).check(
                 deviceRowsInOrder(
                     DeviceRowText("desktop", "Direct", "10.1.0.1 · same Wi-Fi as you"),
-                    DeviceRowText("laptop", "Via helper", "10.1.0.3 · through a helper computer"),
+                    DeviceRowText("laptop", "Helper only", "10.1.0.3 · found through a helper, no traffic yet"),
                     DeviceRowText("attic-pc", "Offline", "10.1.0.4 · last seen 2 h ago"),
                 )
             )
@@ -109,7 +109,7 @@ class MainScreenTest {
             onView(allOf(withId(R.id.deviceBadge), withParent(hasDescendant(withText("laptop")))))
                 .perform(nestedScrollTo(), clickHelpIcon())
 
-            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Via helper"))))
+            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Helper only"))))
             onView(withId(R.id.helpDevice)).check(matches(withText("laptop")))
             onView(withText("Technical details")).perform(nestedScrollTo()).check(matches(isDisplayed()))
             onView(withId(R.id.helpLive)).perform(nestedScrollTo()).check(
