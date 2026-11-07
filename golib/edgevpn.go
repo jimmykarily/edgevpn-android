@@ -177,7 +177,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	// The Alive options must come before the VPN service options: the VPN
 	// service blocks in its packet loop, so services after it never start.
 	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
-	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService))
+	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService, addrLogService))
 
 	// Inject a protected TCP transport so every socket fd is passed through
 	// VpnService.protect() before connect/bind. This prevents the VPN's own
