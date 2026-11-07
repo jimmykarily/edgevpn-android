@@ -306,3 +306,38 @@ func TestSnapshotIgnoresAnotherPeersEntryAtThisPhonesAddressInItsOwnLedger(t *te
 		t.Fatal("addressInUse comes from rejected writes, not from the local ledger")
 	}
 }
+
+func TestSnapshotReportsALocalNetworkClash(t *testing.T) {
+	for _, clash := range []bool{true, false} {
+		snap := buildSnapshot(snapshotInput{State: "looking", SelfAddress: "10.1.0.2", LocalNetworkClash: clash})
+		if snap.LocalNetworkClash != clash {
+			t.Errorf("localNetworkClash = %v, want %v", snap.LocalNetworkClash, clash)
+		}
+		raw, err := json.Marshal(snap)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(raw), `"localNetworkClash":true`); got != clash {
+			t.Errorf("snapshot = %s", raw)
+		}
+		if !clash && strings.Contains(string(raw), "localNetworkClash") {
+			t.Errorf("snapshot has localNetworkClash: %s", raw)
+		}
+	}
+}
+
+func TestSetLocalNetworkClashReachesTheSnapshotUntilStop(t *testing.T) {
+	SetLocalNetworkClash(true)
+	if !collectSnapshot().LocalNetworkClash {
+		t.Fatal("the clash the app reported is missing from the snapshot")
+	}
+	SetLocalNetworkClash(false)
+	if collectSnapshot().LocalNetworkClash {
+		t.Fatal("the clash stayed after the app reported none")
+	}
+	SetLocalNetworkClash(true)
+	Stop()
+	if collectSnapshot().LocalNetworkClash {
+		t.Fatal("the clash outlived Stop")
+	}
+}

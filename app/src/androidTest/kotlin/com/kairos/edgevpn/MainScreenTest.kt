@@ -152,11 +152,37 @@ class MainScreenTest {
     }
 
     @Test
+    fun aWifiInTheVpnRangeShowsTheWarningWithHelp() {
+        snapshot = Snapshots.connectedOnAClashingWifi()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withId(R.id.localNetworkClashText)).check(
+                matches(
+                    allOf(
+                        isDisplayed(),
+                        withTextBeforeHelpIcon(
+                            "This Wi-Fi uses the same addresses as your VPN (10.1.0.x). " +
+                                "While the VPN is on, some devices on this Wi-Fi may not answer."
+                        ),
+                    )
+                )
+            )
+            onView(withId(R.id.changeAddressButton)).check(matches(not(isDisplayed())))
+
+            onView(withId(R.id.localNetworkClashText)).perform(clickHelpIcon())
+            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Wi-Fi uses the VPN's addresses"))))
+            onView(withId(R.id.helpLive)).perform(nestedScrollTo())
+                .check(matches(withText(containsString("VPN route: 10.1.0.0/24"))))
+            pressBack()
+        }
+    }
+
+    @Test
     fun noWarningWhenNoOtherDeviceHoldsTheAddress() {
         snapshot = Snapshots.connectedWithThreeDevices()
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withId(R.id.addressInUseText)).check(matches(not(isDisplayed())))
             onView(withId(R.id.changeAddressButton)).check(matches(not(isDisplayed())))
+            onView(withId(R.id.localNetworkClashText)).check(matches(not(isDisplayed())))
         }
     }
 }

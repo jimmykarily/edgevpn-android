@@ -23,6 +23,8 @@ data class ScreenPlan(
     val onlyDevice: Boolean,
     /** The warning on the status card that another device uses this phone's address. */
     val showAddressInUse: Boolean,
+    /** The warning on the status card that the Wi-Fi or Ethernet network uses the VPN's range. */
+    val showLocalNetworkClash: Boolean,
 )
 
 fun planScreen(m: StatusModel): ScreenPlan {
@@ -49,6 +51,7 @@ fun planScreen(m: StatusModel): ScreenPlan {
         showSeeLogs = m.state == VpnState.PROBLEM,
         onlyDevice = m.state == VpnState.CONNECTED && m.total == 1,
         showAddressInUse = running && m.addressInUse && m.selfAddress.isNotEmpty(),
+        showLocalNetworkClash = running && m.localNetworkClash && m.selfAddress.isNotEmpty(),
     )
 }
 

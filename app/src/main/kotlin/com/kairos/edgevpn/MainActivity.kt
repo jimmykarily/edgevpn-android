@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mainButton: MaterialButton
     private lateinit var seeLogsButton: View
     private lateinit var addressInUseText: TextView
+    private lateinit var localNetworkClashText: TextView
     private lateinit var changeAddressButton: View
     private lateinit var pills: View
     private lateinit var addressPill: View
@@ -129,6 +130,7 @@ class MainActivity : AppCompatActivity() {
         mainButton = findViewById(R.id.mainButton)
         seeLogsButton = findViewById(R.id.seeLogsButton)
         addressInUseText = findViewById(R.id.addressInUseText)
+        localNetworkClashText = findViewById(R.id.localNetworkClashText)
         changeAddressButton = findViewById(R.id.changeAddressButton)
         pills = findViewById(R.id.pills)
         addressPill = findViewById(R.id.addressPill)
@@ -278,6 +280,11 @@ class MainActivity : AppCompatActivity() {
         if (plan.showAddressInUse) {
             addressInUseText.text = getString(R.string.address_in_use_text, m.selfAddress)
             addressInUseText.appendHelpIcon(HelpTerm.ADDRESS_IN_USE) { openHelp(it) }
+        }
+        localNetworkClashText.visibility = visibleIf(plan.showLocalNetworkClash)
+        if (plan.showLocalNetworkClash) {
+            localNetworkClashText.text = getString(R.string.local_network_clash_text, vpnRangeLabel(m.selfAddress))
+            localNetworkClashText.appendHelpIcon(HelpTerm.LOCAL_NETWORK_CLASH) { openHelp(it) }
         }
 
         pills.visibility = visibleIf(plan.showPills)

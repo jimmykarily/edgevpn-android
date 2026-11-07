@@ -2,6 +2,7 @@ package com.kairos.edgevpn
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -24,6 +25,11 @@ import android.util.Log
  *   is the VPN itself, so the request asks for NOT_VPN. API 31 and later let Android rank the
  *   networks; before that every matching network is kept and [pickNetwork] chooses.
  *
+ * The local callback also reads the address ranges of those networks and calls [onClash] when
+ * whether one of them overlaps the VPN's range for [vpnAddress] ([clashesWithVpn]) changes.
+ * Mobile data is left out: carriers often hand out private addresses, and nothing on that
+ * network is meant to be reached.
+ *
  * The local callback is registered first, so its networks are usually known when the best
  * network is first reported. Go merges reports that arrive within 500 ms, so a first report
  * with the local flag still unknown is not acted on.
@@ -33,7 +39,9 @@ import android.util.Log
  */
 class UnderlyingNetworkWatcher(
     context: Context,
+    private val vpnAddress: String,
     private val onChange: (Network?, Boolean) -> Unit,
+    private val onClash: (Boolean) -> Unit,
 ) {
     companion object {
         private const val TAG = "EdgeVpnService"
@@ -95,6 +103,9 @@ class UnderlyingNetworkWatcher(
          * only the latest best network. */
         private val bestKnown = HashMap<Network, NetworkInfo>()
         private val filter = ReportFilter<Network>()
+        /** The address ranges of the connected Wi-Fi and Ethernet networks. */
+        private val localPrefixes = HashMap<Network, List<LinkPrefix>>()
+        private var lastClash: Boolean? = null
 
         val local = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
@@ -103,10 +114,20 @@ class UnderlyingNetworkWatcher(
                 report()
             }
 
+            override fun onLinkPropertiesChanged(network: Network, props: LinkProperties) {
+                if (active !== this@Watch) return
+                localPrefixes[network] = props.linkAddresses.map {
+                    LinkPrefix(it.address.hostAddress ?: "", it.prefixLength)
+                }
+                reportClash()
+            }
+
             override fun onLost(network: Network) {
                 if (active !== this@Watch) return
                 localKnown.remove(network)
+                localPrefixes.remove(network)
                 report()
+                reportClash()
             }
         }
 
@@ -130,6 +151,14 @@ class UnderlyingNetworkWatcher(
                 bestKnown.remove(network)
                 report()
             }
+        }
+
+        private fun reportClash() {
+            val clash = clashesWithVpn(vpnAddress, localPrefixes.values.flatten())
+            if (clash == lastClash) return
+            lastClash = clash
+            Log.i(TAG, "Local network uses the VPN's range: $clash")
+            onClash(clash)
         }
 
         private fun report() {

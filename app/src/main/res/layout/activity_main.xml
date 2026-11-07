@@ -111,6 +111,20 @@
                         tools:text="Another device already uses 10.1.0.2. Pick another address in Settings."
                         tools:visibility="visible" />
 
+                    <!-- Shown when the Wi-Fi or Ethernet network uses the VPN's range. -->
+                    <TextView
+                        android:id="@+id/localNetworkClashText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingMultiplier="1.15"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:visibility="gone"
+                        tools:text="This Wi-Fi uses the same addresses as your VPN (10.1.0.x). While the VPN is on, some devices on this Wi-Fi may not answer."
+                        tools:visibility="visible" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/changeAddressButton"
                         style="@style/Widget.Material3.Button.TextButton"
