@@ -100,3 +100,43 @@ func TestVPNSubnet(t *testing.T) {
 		}
 	}
 }
+
+func TestAddrsFactoryDropsAResolvedVPNAddress(t *testing.T) {
+	// libp2p resolves wildcard listeners itself where Go can list the
+	// interfaces, so the tunnel's address can arrive already resolved.
+	factory := newAddrsFactory(vpnSubnet("10.5.0.4"), fixedAddrs(ipNet(t, "192.168.21.35/23")))
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/10.5.0.4/tcp/4001"),
+		ma.StringCast("/ip4/192.168.21.35/tcp/4001"),
+	}))
+	want := []string{"/ip4/192.168.21.35/tcp/4001"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestAddrsFactoryDropsTheVPNAddressWhenInterfacesCannotBeRead(t *testing.T) {
+	factory := newAddrsFactory(vpnSubnet("10.5.0.4"), func() ([]net.Addr, error) {
+		return nil, errors.New("netlink blocked")
+	})
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/10.5.0.4/tcp/4001"),
+		ma.StringCast("/ip4/0.0.0.0/tcp/4001"),
+	}))
+	want := []string{"/ip4/0.0.0.0/tcp/4001"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestAddrsFactoryDropsTheVPNAddressWhenNoInterfaceIsUsable(t *testing.T) {
+	factory := newAddrsFactory(vpnSubnet("10.5.0.4"), fixedAddrs(ipNet(t, "10.5.0.4/24")))
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/10.5.0.4/tcp/4001"),
+		ma.StringCast("/p2p-circuit"),
+	}))
+	want := []string{"/p2p-circuit"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

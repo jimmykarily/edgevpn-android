@@ -31,8 +31,35 @@ func vpnSubnet(address string) *net.IPNet {
 // exists, and a LAN address inside vpnNet is routed into the tunnel too.
 // A nil vpnNet leaves out no subnet.
 //
-// For non-wildcard listen addresses the original address is kept as is.
+// Other addresses are kept as is, except those with an IP in vpnNet, which
+// are dropped from every list the factory returns. libp2p resolves wildcard
+// listeners itself where Go can list the interfaces, so the tunnel's address
+// can arrive here already resolved.
 func newAddrsFactory(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, error)) func([]ma.Multiaddr) []ma.Multiaddr {
+	resolve := resolveListenAddrs(vpnNet, interfaceAddrs)
+	return func(listenAddrs []ma.Multiaddr) []ma.Multiaddr {
+		return withoutSubnet(resolve(listenAddrs), vpnNet)
+	}
+}
+
+// withoutSubnet returns addrs without the ones whose IP is in subnet. A nil
+// subnet keeps all of them, and so do addresses without an IP.
+func withoutSubnet(addrs []ma.Multiaddr, subnet *net.IPNet) []ma.Multiaddr {
+	if subnet == nil {
+		return addrs
+	}
+	out := make([]ma.Multiaddr, 0, len(addrs))
+	for _, a := range addrs {
+		if ip, err := manet.ToIP(a); err == nil && subnet.Contains(ip) {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// resolveListenAddrs does the expansion part of newAddrsFactory.
+func resolveListenAddrs(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, error)) func([]ma.Multiaddr) []ma.Multiaddr {
 	return func(listenAddrs []ma.Multiaddr) []ma.Multiaddr {
 		ifAddrs, err := interfaceAddrs()
 		if err != nil {
