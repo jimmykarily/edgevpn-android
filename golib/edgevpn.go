@@ -21,7 +21,6 @@ import (
 	"github.com/mudler/edgevpn/pkg/services"
 	"github.com/mudler/edgevpn/pkg/vpn"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/wlynxg/anet"
 
 	// Required by gomobile's generated binding code at build time.
@@ -226,7 +225,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 			// into real interface IPs via anet.InterfaceAddrs(), which uses
 			// sendto() instead of bind() on the netlink socket and works on
 			// Android.
-			libp2p.AddrsFactory(androidAddrsFactory),
+			libp2p.AddrsFactory(newAddrsFactory(vpnSubnet(address), anet.InterfaceAddrs)),
 		),
 	)
 
@@ -371,83 +370,4 @@ func Stop() {
 // Status returns "off", "looking", "connected" or "problem".
 func Status() string {
 	return collectSnapshot().State
-}
-
-// androidAddrsFactory replaces unspecified listen addresses (0.0.0.0, ::)
-// with real interface IPs obtained via anet.InterfaceAddrs(). On Android,
-// the standard Go net.InterfaceAddrs() fails because SELinux blocks
-// bind() on netlink_route_socket. The anet library works around this by
-// using sendto() directly, avoiding the bind call.
-//
-// For non-wildcard listen addresses the original address is kept as-is.
-func androidAddrsFactory(listenAddrs []ma.Multiaddr) []ma.Multiaddr {
-	// Get real interface addresses via anet (works on Android).
-	ifAddrs, err := anet.InterfaceAddrs()
-	if err != nil {
-		emit("WARN ", fmt.Sprintf("anet.InterfaceAddrs failed: %v; using listen addrs as-is", err))
-		return listenAddrs
-	}
-
-	// Convert net.Addr to multiaddrs, skip loopback, link-local IPv6, and our
-	// own VPN subnet (10.1.0.0/24) — advertising 10.1.0.2 would make peers
-	// try routing through the not-yet-established VPN tunnel.
-	vpnNet := &net.IPNet{IP: net.IP{10, 1, 0, 0}, Mask: net.CIDRMask(24, 32)}
-	var resolved []ma.Multiaddr
-	for _, a := range ifAddrs {
-		ipNet, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-		ip := ipNet.IP
-		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || vpnNet.Contains(ip) {
-			continue
-		}
-		maddr, err := manet.FromIP(ip)
-		if err != nil {
-			continue
-		}
-		resolved = append(resolved, maddr)
-	}
-
-	if len(resolved) == 0 {
-		emit("WARN ", "androidAddrsFactory: no usable interface addresses found")
-		return listenAddrs
-	}
-
-	// For each listen address, if it's on a wildcard or loopback IP, expand it
-	// to all resolved IPs with the same transport/port. Otherwise keep it.
-	//
-	// We must handle loopback as well as wildcards because on Android,
-	// go-libp2p's interfaceAddrsCache falls back to loopback-only when
-	// manet.InterfaceMultiaddrs() fails (netlinkrib is blocked by SELinux).
-	// go-libp2p then resolves wildcard listen addrs (0.0.0.0) to 127.0.0.1
-	// before calling AddrsFactory, so by the time we get here the wildcards
-	// are already gone and we see 127.0.0.1:PORT instead of 0.0.0.0:PORT.
-	var out []ma.Multiaddr
-	for _, la := range listenAddrs {
-		ip, err := manet.ToIP(la)
-		if err != nil {
-			// Not an IP-based address (e.g. /p2p-circuit) — keep as-is.
-			out = append(out, la)
-			continue
-		}
-		if !ip.IsUnspecified() && !ip.IsLoopback() {
-			// Already a specific, routable address — keep as-is.
-			out = append(out, la)
-			continue
-		}
-
-		// Wildcard or loopback → expand to real interface IPs with the same transport/port.
-		_, transport := ma.SplitFirst(la)
-
-		for _, rAddr := range resolved {
-			expanded := rAddr
-			if transport != nil {
-				expanded = rAddr.Encapsulate(transport)
-			}
-			out = append(out, expanded)
-		}
-	}
-
-	return out
 }
