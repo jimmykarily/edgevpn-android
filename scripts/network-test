@@ -14,11 +14,15 @@
 #
 # NETWORK_TEST_LONG=0 skips the off/on part for a quick local run.
 # NETWORK_TEST_SWITCH=0 skips the part that switches the emulator's network
-# (Wi-Fi off, Wi-Fi on, airplane mode); NETWORK_TEST_SWITCH_TIMEOUT is the
-# number of seconds each step has to get pings working both ways again.
+# (Wi-Fi off, Wi-Fi on, airplane mode, a Wi-Fi without internet);
+# NETWORK_TEST_SWITCH_TIMEOUT is the number of seconds each step has to get
+# pings working both ways again.
 # NETWORK_TEST_MDNS_CHECK=0 skips the mDNS checks: no fresh
 # "mdns(android): using interfaces:" line while Wi-Fi is off, and a fresh one
 # listing wlan0 after Wi-Fi is back.
+# NETWORK_TEST_NO_INTERNET=0 skips the switch step that rejoins a Wi-Fi
+# Android believes has no internet: the VPN must move to mobile data and
+# mDNS must still run on wlan0.
 #
 # NETWORK_TEST_SCENARIO=address-in-use runs another check instead: the peer
 # moves to the app's address before the app turns on, and the app must warn
@@ -51,6 +55,7 @@ LONG="${NETWORK_TEST_LONG:-1}"
 SWITCH="${NETWORK_TEST_SWITCH:-1}"
 SWITCH_TIMEOUT="${NETWORK_TEST_SWITCH_TIMEOUT:-60}"
 MDNS_CHECK="${NETWORK_TEST_MDNS_CHECK:-1}"
+NO_INTERNET="${NETWORK_TEST_NO_INTERNET:-1}"
 SCENARIO="${NETWORK_TEST_SCENARIO:-basic}"
 case "$SCENARIO" in
     basic) OUT="${NETWORK_TEST_OUT:-$ROOT/build/network-test}" ;;
@@ -307,6 +312,58 @@ mdns_wlan0_lines() {
     adb_ logcat -d -b main 2>/dev/null | grep -F 'mdns(android): using interfaces:' | grep -c 'wlan0' || true
 }
 
+# The app's latest "Underlying network: ..." log line, without the logcat
+# prefix, such as "Underlying network: wifi, local network: true".
+last_underlying() {
+    adb_ logcat -d -b main -s EdgeVpnService:I 2>/dev/null |
+        grep -o 'Underlying network: .*' | tail -n 1 | tr -d '\r'
+}
+
+# Waits up to $1 seconds for the app to ride on mobile data with a Wi-Fi
+# or Ethernet network connected, then true when it still does $2 seconds
+# later. A Wi-Fi that rejoins is connected for about half a second before
+# Android validates it, so only a state that lasts shows a Wi-Fi Android
+# keeps without internet.
+stays_on_cellular_with_local() {
+    local want="Underlying network: cellular, local network: true"
+    local deadline=$(($(date +%s) + $1))
+    until [ "$(last_underlying)" = "$want" ]; do
+        [ "$(date +%s)" -lt "$deadline" ] || return 1
+        sleep 0.2
+    done
+    sleep "$2"
+    [ "$(last_underlying)" = "$want" ]
+}
+
+# Waits up to $3 seconds for the count printed by command $1 to rise above
+# $2. Returns 1 when it does not.
+wait_count_above() {
+    local deadline=$(($(date +%s) + $3))
+    until [ "$($1)" -gt "$2" ]; do
+        [ "$(date +%s)" -lt "$deadline" ] || return 1
+        sleep 2
+    done
+}
+
+# The settings that tell Android where to check for internet access. Set to
+# an address nobody answers on, they make a working Wi-Fi look like one
+# without internet: Android keeps it connected but not validated, and
+# sends traffic over mobile data.
+INTERNET_CHECK_SETTINGS="captive_portal_http_url captive_portal_https_url captive_portal_fallback_url captive_portal_other_fallback_urls"
+DEAD_CHECK_URL="http://10.0.2.250/generate_204"
+
+# Breaks ($1 "broken") or restores ("normal") Android's internet check.
+internet_check() {
+    local k
+    for k in $INTERNET_CHECK_SETTINGS; do
+        if [ "$1" = broken ]; then
+            adb_ shell settings put global "$k" "$DEAD_CHECK_URL"
+        else
+            adb_ shell settings delete global "$k" >/dev/null
+        fi
+    done
+}
+
 # Runs the network change in $2 (a command string run with eval), then
 # measures the seconds until the app and the peer can ping each other, and
 # fails when that takes longer than SWITCH_TIMEOUT. $1 names the step in the
@@ -392,8 +449,10 @@ airplane_mode() {
         adb_ shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state "$state" >/dev/null
 }
 
-# Puts Wi-Fi on and airplane mode off, whatever state a step left them in.
+# Puts Wi-Fi on, airplane mode off and Android's internet check back,
+# whatever state a step left them in.
 restore_network() {
+    internet_check normal >/dev/null 2>&1
     airplane_mode disable >/dev/null 2>&1
     adb_ shell svc wifi enable >/dev/null 2>&1
 }
@@ -657,6 +716,39 @@ main() {
             wait_wlan0 up 120 || fail "wlan0 did not come back within 120s of airplane mode off"
             log "wlan0 is up after $(($(date +%s) - start))s"
             start=$(date +%s)'
+        if [ "$NO_INTERNET" != 0 ]; then
+            mdns_before=$(mdns_wlan0_lines)
+            switch_step wifi-no-internet 'internet_check broken
+                adb_ shell svc wifi disable
+                wait_wlan0 down || fail "wlan0 did not go down"
+                adb_ shell svc wifi enable
+                wait_wlan0 up 120 || fail "wlan0 did not come up within 120s"
+                log "wlan0 is up after $(($(date +%s) - start))s"
+                start=$(date +%s)
+                stays_on_cellular_with_local "$SWITCH_TIMEOUT" 15 ||
+                    fail "the VPN did not stay on mobile data with the Wi-Fi without internet connected; the app last logged: $(last_underlying)"
+                log "the VPN rides on mobile data while the Wi-Fi without internet stays connected"
+                start=$(date +%s)'
+            if [ "$MDNS_CHECK" != 0 ]; then
+                wait_count_above mdns_wlan0_lines "$mdns_before" "$SWITCH_TIMEOUT" ||
+                    fail "no fresh mdns(android) line listing wlan0 on the Wi-Fi without internet"
+                log "the app runs mDNS on wlan0 although the Wi-Fi has no internet"
+            fi
+            switch_step wifi-internet-back 'internet_check normal
+                adb_ shell svc wifi disable
+                wait_wlan0 down || fail "wlan0 did not go down"
+                adb_ shell svc wifi enable
+                wait_wlan0 up 120 || fail "wlan0 did not come up within 120s"
+                log "wlan0 is up after $(($(date +%s) - start))s"
+                start=$(date +%s)'
+            local deadline=$(($(date +%s) + SWITCH_TIMEOUT))
+            until [ "$(last_underlying)" = "Underlying network: wifi, local network: true" ]; do
+                [ "$(date +%s)" -lt "$deadline" ] ||
+                    fail "the VPN did not move back to Wi-Fi once it had internet; the app last logged: $(last_underlying)"
+                sleep 1
+            done
+            log "the VPN rides on Wi-Fi again"
+        fi
     fi
 
     if [ "$LONG" != 0 ]; then
