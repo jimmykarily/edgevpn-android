@@ -163,8 +163,8 @@ class EdgeVpnService : VpnService() {
             // The VPN carries only IPv4. Without this Android gives the VPN an
             // unreachable ::/0 route and no app can use IPv6. With Android's
             // "Always-on VPN, block connections without VPN" IPv6 may now bypass
-            // the VPN; that is acceptable because the VPN carries only
-            // 10.1.0.0/24 (untested).
+            // the VPN; that is acceptable because the VPN carries only the /24
+            // of its own address (untested).
             .allowFamily(OsConstants.AF_INET6)
             .setMtu(1500)
             .setSession("EdgeVPN")
@@ -199,9 +199,12 @@ class EdgeVpnService : VpnService() {
             mainHandler.postDelayed(statusTicker, TICK_MS)
             Log.i(TAG, "VPN started")
             val mySession = session
-            networkWatcher = UnderlyingNetworkWatcher(this) { network, local ->
-                onUnderlyingNetwork(mySession, network, local)
-            }.also { it.start() }
+            networkWatcher = UnderlyingNetworkWatcher(
+                this,
+                address,
+                onChange = { network, local -> onUnderlyingNetwork(mySession, network, local) },
+                onClash = { clash -> if (mySession == session && isRunning) Edgevpn.setLocalNetworkClash(clash) },
+            ).also { it.start() }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start VPN", e)
             failStart("The VPN could not start with this network key. The logs have the details.")

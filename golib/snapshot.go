@@ -55,6 +55,9 @@ type snapshotJSON struct {
 	// AddressInUse is true while another device claims this phone's address
 	// (see addressInUseWindow).
 	AddressInUse bool `json:"addressInUse,omitempty"`
+	// LocalNetworkClash is true while a Wi-Fi or Ethernet network the phone
+	// is on uses addresses in the VPN's range (see SetLocalNetworkClash).
+	LocalNetworkClash bool `json:"localNetworkClash,omitempty"`
 }
 
 // snapshotInput is everything buildSnapshot needs, gathered by the caller.
@@ -72,6 +75,7 @@ type snapshotInput struct {
 	// AddressRejectedAt is when this node last rejected another peer's
 	// machines entry at SelfAddress, zero if never.
 	AddressRejectedAt time.Time
+	LocalNetworkClash bool
 }
 
 func unixOrZero(t time.Time) int64 {
@@ -94,6 +98,7 @@ func buildSnapshot(in snapshotInput) snapshotJSON {
 		Devices:   []deviceJSON{},
 		AddressInUse: !in.AddressRejectedAt.IsZero() &&
 			in.Now.Sub(in.AddressRejectedAt) < addressInUseWindow,
+		LocalNetworkClash: in.LocalNetworkClash,
 	}
 
 	deviceIDs := map[string]bool{}
@@ -212,6 +217,8 @@ func collectSnapshot() snapshotInput {
 		Detail:      failureDetail,
 		SelfAddress: selfAddress,
 		SelfName:    selfName,
+
+		LocalNetworkClash: localNetworkClash,
 	}
 	mu.Unlock()
 	if in.SelfAddress != "" {
@@ -287,6 +294,21 @@ func readNetwork(n *node.Node, ready bool, in *snapshotInput) {
 			}
 		}
 	}
+}
+
+// localNetworkClash is what the app last reported through
+// SetLocalNetworkClash for this session. It is guarded by mu.
+var localNetworkClash bool
+
+// SetLocalNetworkClash tells the core whether a Wi-Fi or Ethernet network
+// the phone is on uses addresses in the VPN's /24. The app works this out
+// from Android's view of the networks, which knows which interface is
+// Wi-Fi; the core only passes it on in the snapshot. Start and Stop
+// clear it.
+func SetLocalNetworkClash(clash bool) {
+	mu.Lock()
+	localNetworkClash = clash
+	mu.Unlock()
 }
 
 // Snapshot returns the state of the network as JSON for the app.
