@@ -90,9 +90,17 @@ func networkConfig(token, address string) config.Config {
 		// AutoRelay reserves a slot on a public circuit v2 relay and advertises
 		// /p2p-circuit addresses; HolePunch coordinates DCUtR to establish a direct
 		// connection once a relayed path exists.
+		//
+		// The relay service is the other side of AutoRelay: it lets other
+		// peers reserve a slot on this node. edgevpn offers it by default,
+		// with limits of 1 GiB and 30 minutes per circuit. On a phone with a
+		// public address any libp2p node could then send traffic through it
+		// at the cost of the user's data and battery, so the phone only uses
+		// relays and never serves as one.
 		Connection: config.Connection{
-			AutoRelay: true,
-			HolePunch: true,
+			AutoRelay:    true,
+			HolePunch:    true,
+			RelayService: config.RelayService{Disabled: true},
 		},
 		// CLI defaults both of these to 10s (cmd/util.go). If left at zero, vpn's
 		// BackoffTicker(MaxInterval=0) misbehaves and the VPN service's
