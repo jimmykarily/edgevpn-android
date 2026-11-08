@@ -35,7 +35,12 @@ func ValidateToken(token string) string {
 		return tokenTruncatedMsg
 	}
 
-	if cfg.OTP.DHT.Key == "" || cfg.OTP.Crypto.Key == "" || cfg.RoomName == "" || cfg.Rendezvous == "" {
+	// Without an mDNS name the phone cannot find devices on the same Wi-Fi,
+	// and edgevpn hands the message size to pubsub as its size limit, so
+	// zero or less leaves no room for ledger messages. edgevpn writes both
+	// into every key it generates.
+	if cfg.OTP.DHT.Key == "" || cfg.OTP.Crypto.Key == "" || cfg.RoomName == "" || cfg.Rendezvous == "" ||
+		cfg.MDNS == "" || cfg.MaxMessageSize <= 0 {
 		return tokenMissingMessage
 	}
 	return ""
