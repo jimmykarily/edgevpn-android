@@ -10,7 +10,6 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.closeSoftKeyboard
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
@@ -21,6 +20,7 @@ import edgevpn.Edgevpn
 import java.security.SecureRandom
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,7 +46,7 @@ class JoinScreenTest {
         val cut = key.dropLast(5)
 
         ActivityScenario.launch(JoinActivity::class.java).use { scenario ->
-            onView(withId(R.id.keyField)).perform(replaceText(cut))
+            onView(withId(R.id.keyField)).perform(replaceSecretText(cut))
             closeSoftKeyboard()
             onView(withId(R.id.joinButton)).perform(click())
 
@@ -55,6 +55,7 @@ class JoinScreenTest {
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
             assertNull(TokenStore.load(context))
         }
+        assertNotInOwnLogs(cut)
     }
 
     @Test
@@ -95,6 +96,22 @@ class JoinScreenTest {
             max_message_size: 20971520
         """.trimIndent() + "\n"
         return Base64.encodeToString(yaml.toByteArray(), Base64.NO_WRAP)
+    }
+
+    /**
+     * Fails when any piece of [secret] is in this process's logcat. The test reports of CI upload the
+     * logcat of every test, so a key typed by a test must not reach it, not even through Espresso's
+     * own description of the action.
+     */
+    private fun assertNotInOwnLogs(secret: String) {
+        val logs = Runtime.getRuntime()
+            .exec(arrayOf("logcat", "-d", "--pid", android.os.Process.myPid().toString()))
+            .inputStream.bufferedReader().readText()
+        assertTrue("logcat must be readable for this check", logs.isNotEmpty())
+        val pieces = (0..3).map { secret.substring(it * secret.length / 4).take(24) }
+        for (piece in pieces) {
+            assertFalse("a piece of the key is in logcat: ${piece.take(6)}...", logs.contains(piece))
+        }
     }
 
     private fun random(): String {
