@@ -140,3 +140,50 @@ func TestAddrsFactoryDropsTheVPNAddressWhenNoInterfaceIsUsable(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+func TestAddrsFactoryExpandsEachWildcardToItsOwnAddressFamily(t *testing.T) {
+	// The IPv4 and IPv6 listeners have different ports, so an IPv6 address
+	// with the IPv4 port points at a port where nothing listens.
+	factory := newAddrsFactory(vpnSubnet("10.1.0.4"), fixedAddrs(
+		ipNet(t, "192.168.21.35/23"),
+		ipNet(t, "2001:db8::35/64"),
+	))
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/0.0.0.0/tcp/4001"),
+		ma.StringCast("/ip6/::/tcp/4002"),
+	}))
+	want := []string{"/ip4/192.168.21.35/tcp/4001", "/ip6/2001:db8::35/tcp/4002"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestAddrsFactoryExpandsEachLoopbackToItsOwnAddressFamily(t *testing.T) {
+	// go-libp2p hands the wildcard listeners over as loopback addresses
+	// when it cannot list the interfaces, which is the case on Android.
+	factory := newAddrsFactory(vpnSubnet("10.1.0.4"), fixedAddrs(
+		ipNet(t, "192.168.21.35/23"),
+		ipNet(t, "2001:db8::35/64"),
+	))
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/127.0.0.1/tcp/4001"),
+		ma.StringCast("/ip6/::1/tcp/4002"),
+	}))
+	want := []string{"/ip4/192.168.21.35/tcp/4001", "/ip6/2001:db8::35/tcp/4002"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestAddrsFactoryDropsAWildcardWithNoAddressOfItsFamily(t *testing.T) {
+	// An IPv4-only network: the IPv6 listener has nothing to advertise.
+	factory := newAddrsFactory(vpnSubnet("10.1.0.4"), fixedAddrs(ipNet(t, "192.168.21.35/23")))
+	got := addrStrings(factory([]ma.Multiaddr{
+		ma.StringCast("/ip4/0.0.0.0/tcp/4001"),
+		ma.StringCast("/ip6/::/tcp/4002"),
+	}))
+	want := []string{"/ip4/192.168.21.35/tcp/4001"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
