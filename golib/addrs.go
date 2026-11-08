@@ -67,7 +67,7 @@ func resolveListenAddrs(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, er
 			return listenAddrs
 		}
 
-		var resolved []ma.Multiaddr
+		var resolved []net.IP
 		for _, a := range ifAddrs {
 			ipNet, ok := a.(*net.IPNet)
 			if !ok {
@@ -77,11 +77,7 @@ func resolveListenAddrs(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, er
 			if ip.IsLoopback() || ip.IsLinkLocalUnicast() || (vpnNet != nil && vpnNet.Contains(ip)) {
 				continue
 			}
-			maddr, err := manet.FromIP(ip)
-			if err != nil {
-				continue
-			}
-			resolved = append(resolved, maddr)
+			resolved = append(resolved, ip)
 		}
 
 		if len(resolved) == 0 {
@@ -90,7 +86,10 @@ func resolveListenAddrs(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, er
 		}
 
 		// For each listen address, if it's on a wildcard or loopback IP, expand it
-		// to all resolved IPs with the same transport/port. Otherwise keep it.
+		// to the resolved IPs of the same family with the same transport/port.
+		// Otherwise keep it. The IPv4 and IPv6 listeners are separate sockets
+		// with their own ports, so an IPv6 address with the IPv4 listener's
+		// port would point at a port where nothing listens.
 		//
 		// Loopback is handled as well as wildcards because on Android,
 		// go-libp2p's interfaceAddrsCache falls back to loopback-only when
@@ -112,12 +111,20 @@ func resolveListenAddrs(vpnNet *net.IPNet, interfaceAddrs func() ([]net.Addr, er
 				continue
 			}
 
-			// Wildcard or loopback: expand to the interface IPs with the same transport/port.
+			// Wildcard or loopback: expand to the interface IPs of the same
+			// family with the same transport/port.
 			_, transport := ma.SplitFirst(la)
-			for _, rAddr := range resolved {
-				expanded := rAddr
+			isIPv4 := ip.To4() != nil
+			for _, rIP := range resolved {
+				if (rIP.To4() != nil) != isIPv4 {
+					continue
+				}
+				expanded, err := manet.FromIP(rIP)
+				if err != nil {
+					continue
+				}
 				if transport != nil {
-					expanded = rAddr.Encapsulate(transport)
+					expanded = expanded.Encapsulate(transport)
 				}
 				out = append(out, expanded)
 			}
