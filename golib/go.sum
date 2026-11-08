@@ -339,8 +339,8 @@ github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3Rllmb
 github.com/mr-tron/base58 v1.1.2/go.mod h1:BinMc/sQntlIE1frQmRFPUoPA1Zkr8VRgBdjWI2mNwc=
 github.com/mr-tron/base58 v1.3.0 h1:K6Y13R2h+dku0wOqKtecgRnBUBPrZzLZy5aIj8lCcJI=
 github.com/mr-tron/base58 v1.3.0/go.mod h1:2BuubE67DCSWwVfx37JWNG8emOC0sHEU4/HpcYgCLX8=
-github.com/mudler/edgevpn v0.35.5 h1:TS8S8F/3d0WXcj5vuS+9pLB9XVW94lh5WYxjiMqV0Ag=
-github.com/mudler/edgevpn v0.35.5/go.mod h1:AxRjYPFo1lBD/DHA4oWxPfEu0QLMuZxEJJoriJF1iYw=
+github.com/mudler/edgevpn v0.35.6-0.20261107221934-32e79ea27be2 h1:ZzY0/PM2WcPHDMVZNraiUlfBazIy7g7jt0I5kon67bw=
+github.com/mudler/edgevpn v0.35.6-0.20261107221934-32e79ea27be2/go.mod h1:AxRjYPFo1lBD/DHA4oWxPfEu0QLMuZxEJJoriJF1iYw=
 github.com/mudler/water v0.0.0-20250808092830-dd90dcf09025 h1:WFLP5FHInarYGXi6B/Ze204x7Xy6q/I4nCZnWEyPHK0=
 github.com/mudler/water v0.0.0-20250808092830-dd90dcf09025/go.mod h1:QuIFdRstyGJt+MTTkWY+mtD7U6xwjOR6SwKUjmLZtR4=
 github.com/multiformats/go-base32 v0.1.0 h1:pVx9xoSPqEIQG8o+UbAe7DNi51oej1NtK+aGkbLYxPE=
