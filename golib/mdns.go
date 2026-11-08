@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -29,10 +31,37 @@ func mdnsTag(token string) string {
 	return cfg.MDNS
 }
 
-// runMDNS starts edgevpn's mDNS discovery on h under the service name tag.
-// It returns at once; the discovery stops when ctx is done. Tests replace it.
-var runMDNS = func(ctx context.Context, h host.Host, tag string) error {
-	return (&discovery.MDNS{DiscoveryServiceTag: tag}).Run(&bufferLogger{}, ctx, h)
+// runMDNS starts edgevpn's mDNS discovery on h under the service name tag,
+// on the interfaces filter accepts (all of them when filter is nil). It
+// returns at once; the discovery stops when ctx is done. Tests replace it.
+var runMDNS = func(ctx context.Context, h host.Host, tag string, filter func(net.Interface) bool) error {
+	return (&discovery.MDNS{DiscoveryServiceTag: tag, InterfaceFilter: filter}).Run(&bufferLogger{}, ctx, h)
+}
+
+// parseInterfaceNames turns a comma-separated list of interface names into a
+// set, ignoring blanks.
+func parseInterfaceNames(names string) map[string]bool {
+	set := map[string]bool{}
+	for _, name := range strings.Split(names, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			set[name] = true
+		}
+	}
+	return set
+}
+
+// SetLocalInterfaces tells mDNS the names of the phone's Wi-Fi and Ethernet
+// interfaces, comma-separated, so it announces on those only. On the
+// emulator mobile data is an interface that supports multicast, and only
+// Android knows it is not a local network. With no names mDNS uses every
+// interface that supports multicast. Without a session it does nothing.
+func SetLocalInterfaces(names string) {
+	mu.Lock()
+	r := currentMDNS
+	mu.Unlock()
+	if r != nil {
+		r.setInterfaces(names)
+	}
 }
 
 // mdnsRunner runs mDNS discovery for one VPN session. mDNS runs only while
@@ -43,6 +72,7 @@ type mdnsRunner struct {
 	mu      sync.Mutex
 	tag     string
 	local   bool
+	ifaces  map[string]bool // the local interfaces; empty when none is known
 	parent  context.Context // the node's context; nil until the host is ready
 	h       host.Host
 	cancel  context.CancelFunc // cancels the running instance; nil when none runs
@@ -69,6 +99,32 @@ func (r *mdnsRunner) setLocal(local bool) {
 	if r.cancel == nil {
 		r.startLocked()
 	}
+}
+
+// setInterfaces records the local interface names (see SetLocalInterfaces)
+// and restarts a running instance when they change.
+func (r *mdnsRunner) setInterfaces(names string) {
+	set := parseInterfaceNames(names)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopped || reflect.DeepEqual(set, r.ifaces) || (len(set) == 0 && len(r.ifaces) == 0) {
+		return
+	}
+	r.ifaces = set
+	if r.cancel != nil {
+		r.cancelLocked()
+		r.startLocked()
+	}
+}
+
+// filterLocked returns the interface filter for a new instance, or nil when
+// no local interface is known. The caller holds r.mu.
+func (r *mdnsRunner) filterLocked() func(net.Interface) bool {
+	if len(r.ifaces) == 0 {
+		return nil
+	}
+	set := r.ifaces
+	return func(iface net.Interface) bool { return set[iface.Name] }
 }
 
 // hostReady records the node's context and host, and starts mDNS when the
@@ -122,7 +178,7 @@ func (r *mdnsRunner) startLocked() {
 		return
 	}
 	ctx, cancel := context.WithCancel(r.parent)
-	if err := runMDNS(ctx, r.h, r.tag); err != nil {
+	if err := runMDNS(ctx, r.h, r.tag, r.filterLocked()); err != nil {
 		cancel()
 		emit("WARN ", fmt.Sprintf("mdns: cannot start local discovery: %s", hideTag(err.Error(), r.tag)))
 		return

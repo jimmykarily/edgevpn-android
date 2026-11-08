@@ -204,6 +204,7 @@ class EdgeVpnService : VpnService() {
                 address,
                 onChange = { network, local -> onUnderlyingNetwork(mySession, network, local) },
                 onClash = { clash -> if (mySession == session && isRunning) Edgevpn.setLocalNetworkClash(clash) },
+                onInterfaces = { names -> if (mySession == session && isRunning) Edgevpn.setLocalInterfaces(names) },
             ).also { it.start() }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start VPN", e)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -14,21 +16,23 @@ import (
 
 // fakeMDNS replaces runMDNS during a test and records every start.
 type fakeMDNS struct {
-	mu   sync.Mutex
-	ctxs []context.Context
-	tags []string
-	err  error
+	mu      sync.Mutex
+	ctxs    []context.Context
+	tags    []string
+	filters []func(net.Interface) bool
+	err     error
 }
 
 func installFakeMDNS(t *testing.T) *fakeMDNS {
 	t.Helper()
 	f := &fakeMDNS{}
 	orig := runMDNS
-	runMDNS = func(ctx context.Context, _ host.Host, tag string) error {
+	runMDNS = func(ctx context.Context, _ host.Host, tag string, filter func(net.Interface) bool) error {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.ctxs = append(f.ctxs, ctx)
 		f.tags = append(f.tags, tag)
+		f.filters = append(f.filters, filter)
 		return f.err
 	}
 	t.Cleanup(func() { runMDNS = orig })
@@ -45,6 +49,12 @@ func (f *fakeMDNS) ctx(i int) context.Context {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.ctxs[i]
+}
+
+func (f *fakeMDNS) filter(i int) func(net.Interface) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.filters[i]
 }
 
 func (f *fakeMDNS) running() int {
@@ -304,4 +314,103 @@ func TestNodeExitEndsTheMDNSRunner(t *testing.T) {
 	if f.ctx(0).Err() == nil {
 		t.Error("mDNS still runs after the node exited")
 	}
+}
+
+func TestParseInterfaceNames(t *testing.T) {
+	got := parseInterfaceNames(" wlan0, eth1,,wlan0 ")
+	want := map[string]bool{"wlan0": true, "eth1": true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseInterfaceNames = %v, want %v", got, want)
+	}
+	if got := parseInterfaceNames(""); len(got) != 0 {
+		t.Errorf("parseInterfaceNames(\"\") = %v, want empty", got)
+	}
+}
+
+func TestMDNSRunnerUsesEveryInterfaceWhenNoneIsKnown(t *testing.T) {
+	f := installFakeMDNS(t)
+	r := newMDNSRunner("tag")
+	t.Cleanup(r.stop)
+	r.setLocal(true)
+	r.hostReady(context.Background(), nil)
+
+	if f.filter(0) != nil {
+		t.Error("mDNS got an interface filter before any local interface was reported")
+	}
+}
+
+func TestMDNSRunnerKeepsOnlyTheLocalInterfaces(t *testing.T) {
+	f := installFakeMDNS(t)
+	r := newMDNSRunner("tag")
+	t.Cleanup(r.stop)
+	r.setInterfaces("wlan0")
+	r.setLocal(true)
+	r.hostReady(context.Background(), nil)
+
+	filter := f.filter(0)
+	if filter == nil {
+		t.Fatal("mDNS got no interface filter")
+	}
+	if !filter(net.Interface{Name: "wlan0"}) {
+		t.Error("the filter rejects wlan0, a local interface")
+	}
+	if filter(net.Interface{Name: "eth0"}) {
+		t.Error("the filter accepts eth0, which is not a local interface")
+	}
+}
+
+func TestMDNSRunnerRestartsWhenTheLocalInterfacesChange(t *testing.T) {
+	f := installFakeMDNS(t)
+	r := newMDNSRunner("tag")
+	t.Cleanup(r.stop)
+	r.setLocal(true)
+	r.hostReady(context.Background(), nil)
+
+	r.setInterfaces("wlan0")
+	if f.starts() != 2 || f.running() != 1 {
+		t.Fatalf("starts = %d, running = %d after new interfaces, want 2 and 1", f.starts(), f.running())
+	}
+	if f.filter(1) == nil || !f.filter(1)(net.Interface{Name: "wlan0"}) {
+		t.Error("the new instance does not run on wlan0")
+	}
+	r.setInterfaces("wlan0")
+	if f.starts() != 2 {
+		t.Errorf("the same interfaces restarted mDNS: %d starts", f.starts())
+	}
+}
+
+func TestMDNSRunnerDoesNotStartOnInterfacesAlone(t *testing.T) {
+	f := installFakeMDNS(t)
+	r := newMDNSRunner("tag")
+	t.Cleanup(r.stop)
+	r.hostReady(context.Background(), nil)
+
+	r.setInterfaces("wlan0")
+	if f.starts() != 0 {
+		t.Errorf("started %d times without a local network", f.starts())
+	}
+}
+
+func TestSetLocalInterfacesReachesTheSessionRunner(t *testing.T) {
+	t.Cleanup(Stop)
+	f := installFakeMDNS(t)
+	r := newMDNSRunner("tag")
+	r.setLocal(true)
+	r.hostReady(context.Background(), nil)
+	mu.Lock()
+	currentNode, cancelFn, currentMDNS = newTestNode(t), func() {}, r
+	mu.Unlock()
+
+	SetLocalInterfaces("wlan0")
+	if f.starts() != 2 {
+		t.Fatalf("started %d times, want a restart for the new interfaces", f.starts())
+	}
+	if f.filter(1)(net.Interface{Name: "eth0"}) {
+		t.Error("mDNS still runs on eth0")
+	}
+}
+
+func TestSetLocalInterfacesWithoutASessionDoesNothing(t *testing.T) {
+	Stop()
+	SetLocalInterfaces("wlan0")
 }

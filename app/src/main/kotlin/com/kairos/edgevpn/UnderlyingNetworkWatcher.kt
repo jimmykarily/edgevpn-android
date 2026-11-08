@@ -28,7 +28,11 @@ import android.util.Log
  * The local callback also reads the address ranges of those networks and calls [onClash] when
  * whether one of them overlaps the VPN's range for [vpnAddress] ([clashesWithVpn]) changes.
  * Mobile data is left out: carriers often hand out private addresses, and nothing on that
- * network is meant to be reached.
+ * network is meant to be reached. It also calls [onInterfaces] with the interface names of
+ * those networks ([localInterfaceList]) when they change, so mDNS announces on them only.
+ * A Wi-Fi or Ethernet network counts for the local flag only once its link properties have
+ * arrived, which Android delivers after the capabilities. The names go out before a network
+ * turns the flag on and after one turns it off, so Go never starts mDNS with a stale list.
  *
  * The local callback is registered first, so its networks are usually known when the best
  * network is first reported. Go merges reports that arrive within 500 ms, so a first report
@@ -42,6 +46,7 @@ class UnderlyingNetworkWatcher(
     private val vpnAddress: String,
     private val onChange: (Network?, Boolean) -> Unit,
     private val onClash: (Boolean) -> Unit,
+    private val onInterfaces: (String) -> Unit,
 ) {
     companion object {
         private const val TAG = "EdgeVpnService"
@@ -106,6 +111,9 @@ class UnderlyingNetworkWatcher(
         /** The address ranges of the connected Wi-Fi and Ethernet networks. */
         private val localPrefixes = HashMap<Network, List<LinkPrefix>>()
         private var lastClash: Boolean? = null
+        /** The interface names of the connected Wi-Fi and Ethernet networks. */
+        private val localInterfaces = HashMap<Network, String?>()
+        private var lastInterfaces: String? = null
 
         val local = object : ConnectivityManager.NetworkCallback() {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
@@ -119,15 +127,20 @@ class UnderlyingNetworkWatcher(
                 localPrefixes[network] = props.linkAddresses.map {
                     LinkPrefix(it.address.hostAddress ?: "", it.prefixLength)
                 }
+                localInterfaces[network] = props.interfaceName
                 reportClash()
+                reportInterfaces()
+                report()
             }
 
             override fun onLost(network: Network) {
                 if (active !== this@Watch) return
                 localKnown.remove(network)
                 localPrefixes.remove(network)
+                localInterfaces.remove(network)
                 report()
                 reportClash()
+                reportInterfaces()
             }
         }
 
@@ -161,10 +174,18 @@ class UnderlyingNetworkWatcher(
             onClash(clash)
         }
 
+        private fun reportInterfaces() {
+            val names = localInterfaceList(localInterfaces.values)
+            if (names == lastInterfaces) return
+            lastInterfaces = names
+            Log.i(TAG, "Local interfaces: [$names]")
+            onInterfaces(names)
+        }
+
         private fun report() {
             val info = pickNetwork(bestKnown.values)
             val network = info?.let { picked -> bestKnown.entries.first { it.value == picked }.key }
-            val local = onLocalNetwork(localKnown.values)
+            val local = onLocalNetwork(localKnown.filterKeys { it in localInterfaces }.values)
             if (!filter.offer(network, local)) return
             Log.i(TAG, "Underlying network: ${networkLabel(info)}, local network: $local")
             onChange(network, local)

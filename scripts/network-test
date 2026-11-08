@@ -19,10 +19,10 @@
 # pings working both ways again.
 # NETWORK_TEST_MDNS_CHECK=0 skips the mDNS checks: no fresh
 # "mdns(android): using interfaces:" line while Wi-Fi is off, and a fresh one
-# listing wlan0 after Wi-Fi is back.
+# listing wlan0 alone after Wi-Fi is back.
 # NETWORK_TEST_NO_INTERNET=0 skips the switch step that rejoins a Wi-Fi
 # Android believes has no internet: the VPN must move to mobile data and
-# mDNS must still run on wlan0.
+# mDNS must still run on wlan0 alone.
 #
 # NETWORK_TEST_SCENARIO=address-in-use runs another check instead: the peer
 # moves to the app's address before the app turns on, and the app must warn
@@ -307,9 +307,25 @@ mdns_lines() {
     adb_ logcat -d -b main 2>/dev/null | grep -cF 'mdns(android): using interfaces:' || true
 }
 
-# Number of "mdns(android): using interfaces:" log lines that list wlan0.
+# Number of "mdns(android): using interfaces:" log lines that list wlan0 and
+# nothing else. On the emulator mobile data is eth0, which supports
+# multicast, so a line that lists it means the app's interface filter failed.
 mdns_wlan0_lines() {
-    adb_ logcat -d -b main 2>/dev/null | grep -F 'mdns(android): using interfaces:' | grep -c 'wlan0' || true
+    adb_ logcat -d -b main 2>/dev/null | grep -cF 'mdns(android): using interfaces: [wlan0]' || true
+}
+
+# Fails when any "mdns(android): using interfaces:" line of the run lists
+# eth0, the emulator's mobile data. A start without the interface filter
+# lasts only until the next restart, so the count of wlan0-only lines
+# alone does not catch it.
+mdns_never_on_eth0() {
+    local bad
+    bad=$(adb_ logcat -d -b main 2>/dev/null | grep -F 'mdns(android): using interfaces:' | { grep -w 'eth0' || true; } | head -n 5)
+    if [ -n "$bad" ]; then
+        echo "$bad" >&2
+        fail "the app ran mDNS on eth0, the emulator's mobile data"
+    fi
+    log "no mDNS start on eth0 in the app's log so far"
 }
 
 # The app's latest "Underlying network: ..." log line, without the logcat
@@ -775,6 +791,7 @@ main() {
     fi
 
     no_protect_failures
+    [ "$MDNS_CHECK" = 0 ] || mdns_never_on_eth0
     shot connected-final
     "$TESTPEER" machines | sed 's/^/[peer machines] /'
 }

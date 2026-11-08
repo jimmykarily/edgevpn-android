@@ -32,6 +32,11 @@ fun isLocalNetwork(n: NetworkInfo?): Boolean = n != null && (n.wifi || n.etherne
  * the traffic over validated cellular. */
 fun onLocalNetwork(connected: Collection<NetworkInfo>): Boolean = connected.any { isLocalNetwork(it) }
 
+/** The names of the Wi-Fi and Ethernet interfaces for Go's SetLocalInterfaces: sorted,
+ * comma-separated, without blanks or repeats, so the same set always gives the same text. */
+fun localInterfaceList(names: Collection<String?>): String =
+    names.filterNotNull().filter { it.isNotBlank() }.distinct().sorted().joinToString(",")
+
 fun networkLabel(n: NetworkInfo?): String = when {
     n == null -> "none"
     n.wifi -> "wifi"
