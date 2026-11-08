@@ -1,4 +1,4 @@
-module github.com/kairos-io/edgevpn-android/golib
+module github.com/jimmykarily/edgevpn-android/golib
 
 go 1.26.0
 
