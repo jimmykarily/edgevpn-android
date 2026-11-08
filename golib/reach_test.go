@@ -157,7 +157,7 @@ func TestTransportOf(t *testing.T) {
 		"/ip4/192.168.21.73/tcp/4001":               "TCP",
 		"/ip4/192.168.21.73/udp/4001/quic-v1":       "QUIC",
 		"/ip4/192.168.21.73/udp/4001/quic":          "QUIC",
-		"/ip4/203.0.113.17/tcp/4001/p2p-circuit":   "TCP",
+		"/ip4/203.0.113.17/tcp/4001/p2p-circuit":    "TCP",
 		"/ip4/192.168.21.73/udp/4001/webrtc-direct": "other",
 	} {
 		if got := transportOf(ma.StringCast(addr)); got != want {
