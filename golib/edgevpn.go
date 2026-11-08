@@ -172,7 +172,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	// The Alive options must come before the VPN service options: the VPN
 	// service blocks in its packet loop, so services after it never start.
 	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
-	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService, addrLogService))
+	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService, addrLogService, connLogService))
 
 	nodeOpts = append(nodeOpts, node.WithLibp2pAdditionalOptions(hostOptions(address)...))
 

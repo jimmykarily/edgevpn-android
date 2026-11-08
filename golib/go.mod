@@ -7,11 +7,21 @@ require (
 	github.com/libp2p/go-libp2p v0.48.0
 	github.com/mudler/edgevpn v0.35.6-0.20261107221934-32e79ea27be2
 	github.com/multiformats/go-multiaddr v0.16.1
+	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/gomega v1.42.1
 	github.com/quic-go/quic-go v0.59.1
 	github.com/wlynxg/anet v0.0.6-0.20250109065809-5501d401a269
 	go.uber.org/fx v1.24.0
 	golang.org/x/mobile v0.0.0-20260211191516-dcd2a3258864
 	gopkg.in/yaml.v2 v2.4.0
+)
+
+require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
 
 require (

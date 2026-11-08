@@ -328,6 +328,26 @@ mdns_never_on_eth0() {
     log "no mDNS start on eth0 in the app's log so far"
 }
 
+# Waits up to 20 seconds for the app's connection log to list a direct TCP
+# connection to the peer with libp2p ID $1, and prints that log line. The
+# app logs its connections to network peers every 5 seconds when they
+# change. The test peer listens on TCP only, so a direct connection to it
+# is always TCP.
+logs_direct_connection() {
+    local id="$1" deadline=$(($(date +%s) + 20)) line
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        line=$(adb_ logcat -d -b main -s EdgeVPN:I 2>/dev/null | grep -o 'connections to network peers: .*' |
+            tail -n 1 | tr -d '\r')
+        if echo "$line" | grep -qE "$id (in|out) /ip[46]/[^ ,;]*/tcp/[0-9]+(,|;|$)"; then
+            echo "$line"
+            return 0
+        fi
+        sleep 1
+    done
+    echo "last connection log line: ${line:-none}" >&2
+    return 1
+}
+
 # The app's latest "Underlying network: ..." log line, without the logcat
 # prefix, such as "Underlying network: wifi, local network: true".
 last_underlying() {
@@ -697,6 +717,9 @@ main() {
     [ "$sockets" -gt 0 ] || fail "the app has no listening sockets"
     peer_has_app || fail "the peer does not list $APP_ADDRESS while connected"
     log "the peer lists $APP_ADDRESS"
+    local conns
+    conns=$(logs_direct_connection "${peer##*/}") || fail "the app does not log a direct connection to the peer"
+    log "app log: $conns"
     no_address_warning
     screens
 
