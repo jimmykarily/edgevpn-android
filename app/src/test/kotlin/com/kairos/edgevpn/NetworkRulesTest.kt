@@ -108,4 +108,14 @@ class NetworkRulesTest {
     fun noNetworkIsNotLocal() {
         assertFalse(onLocalNetwork(emptyList()))
     }
+
+    @Test
+    fun localInterfacesAreSortedWithoutBlanksOrRepeats() {
+        assertEquals("eth1,wlan0", localInterfaceList(listOf("wlan0", null, "eth1", "", "wlan0")))
+    }
+
+    @Test
+    fun noLocalInterfaceGivesAnEmptyList() {
+        assertEquals("", localInterfaceList(listOf(null)))
+    }
 }
