@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/ipfs/go-log/v2 v2.9.2
 	github.com/libp2p/go-libp2p v0.48.0
-	github.com/mudler/edgevpn v0.35.5
+	github.com/mudler/edgevpn v0.35.6-0.20261107221934-32e79ea27be2
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/quic-go/quic-go v0.59.1
 	github.com/wlynxg/anet v0.0.6-0.20250109065809-5501d401a269
