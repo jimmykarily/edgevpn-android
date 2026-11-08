@@ -9,7 +9,7 @@ import android.net.VpnService
  * whether the screen turned the VPN on, without the permission dialog or a running node, and
  * call [reset] after.
  */
-object VpnStarter {
+internal object VpnStarter {
     private val askAndroid: (Context) -> Intent? = { VpnService.prepare(it) }
     private val startService: (Context) -> Unit = {
         it.startForegroundService(
@@ -19,12 +19,12 @@ object VpnStarter {
 
     /** The intent that asks the user for the VPN permission, or null when it is granted. */
     @Volatile
-    var prepare: (Context) -> Intent? = askAndroid
+    internal var prepare: (Context) -> Intent? = askAndroid
 
     @Volatile
-    var start: (Context) -> Unit = startService
+    internal var start: (Context) -> Unit = startService
 
-    fun reset() {
+    internal fun reset() {
         prepare = askAndroid
         start = startService
     }
