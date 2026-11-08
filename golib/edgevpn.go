@@ -8,20 +8,15 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/mudler/edgevpn/pkg/config"
 	"github.com/mudler/edgevpn/pkg/node"
 	"github.com/mudler/edgevpn/pkg/services"
 	"github.com/mudler/edgevpn/pkg/vpn"
-	ma "github.com/multiformats/go-multiaddr"
-	"github.com/wlynxg/anet"
 
 	// Required by gomobile's generated binding code at build time.
 	_ "golang.org/x/mobile/bind"
@@ -179,64 +174,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeOpts = append(nodeOpts, services.Alive(checkInInterval(), aliveScrub, aliveMax)...)
 	nodeOpts = append(nodeOpts, node.WithNetworkService(hostReadyService, mdnsService, addrLogService))
 
-	// Inject a protected TCP transport so every socket fd is passed through
-	// VpnService.protect() before connect/bind. This prevents the VPN's own
-	// control-plane sockets from being routed back into the TUN interface.
-	//
-	// NoTransports clears the default set (which includes QUIC/WebRTC that
-	// we can't protect yet), then we add back TCP with our protected dialer.
-	// On Android we use a custom dial that creates the socket, protects it, then
-	// connects—guaranteeing protect() runs before connect (avoids "operation not permitted").
-	protectedDialerForAddr := func(_ ma.Multiaddr) (tcp.ContextDialer, error) {
-		if runtime.GOOS == "android" {
-			return newAndroidProtectedDialer(), nil
-		}
-		return &loggingDialer{d: ProtectedDialer()}, nil
-	}
-	nodeOpts = append(nodeOpts,
-		node.WithLibp2pAdditionalOptions(
-			libp2p.NoTransports,
-			libp2p.Transport(tcp.NewTCPTransport,
-				tcp.WithDialerForAddr(protectedDialerForAddr),
-				tcp.DisableReuseport(),
-			),
-			// libp2p.NoTransports sets cfg.Transports to a non-nil empty slice,
-			// which prevents the DefaultListenAddrs fallback from firing. We must
-			// provide explicit listen addresses so the node actually binds a port.
-			// Port 0 lets the OS pick a free port; we use AddrsFactory below to
-			// advertise the real LAN IP instead of 0.0.0.0.
-			libp2p.ListenAddrStrings(
-				"/ip4/0.0.0.0/tcp/0",
-				"/ip6/::/tcp/0",
-			),
-			// Disable NATPortMap which is in edgevpn's defaultLibp2pOptions.
-			// On Android, the netroute call inside NAT gateway discovery is
-			// blocked by SELinux. Mobile devices sit behind carrier/router NAT
-			// anyway and can't map ports, so this is a no-op in practice.
-			libp2p.NATManager(nil),
-			muxerOption(),
-			// On Android, Go's net.InterfaceAddrs() fails because it uses
-			// syscall.NetlinkRIB which calls bind() on a netlink_route_socket
-			// -- blocked by SELinux for untrusted apps. libp2p's address
-			// manager falls back to loopback-only, so the node never
-			// advertises its LAN IP and can't be reached by peers on the
-			// same network.
-			//
-			// Fix: use AddrsFactory to resolve listen addresses (0.0.0.0)
-			// into real interface IPs via anet.InterfaceAddrs(), which uses
-			// sendto() instead of bind() on the netlink socket and works on
-			// Android.
-			libp2p.AddrsFactory(newAddrsFactory(vpnSubnet(address), anet.InterfaceAddrs)),
-		),
-	)
-
-	// QUIC temporarily disabled: PSK (Private Shared Key) wraps bytes with XSalsa20,
-	// which breaks QUIC's TLS handshake. mDNS fires at ~220ms and h.Connect() attempts
-	// QUIC first; the handshake hangs indefinitely, blocking node startup entirely.
-	// TCP-only until QUIC+PSK incompatibility is resolved.
-	// nodeOpts = append(nodeOpts,
-	// 	node.WithLibp2pAdditionalOptions(quicTransportOptions()...),
-	// )
+	nodeOpts = append(nodeOpts, node.WithLibp2pAdditionalOptions(hostOptions(address)...))
 
 	vpnOpts = append(vpnOpts, vpn.WithInterface(tunFile))
 
