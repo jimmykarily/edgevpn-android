@@ -154,7 +154,8 @@ func TestStartWithAnUnusableDescriptorRemembersAPlainReason(t *testing.T) {
 
 // A token that edgevpn cannot read fails when the node is created, and the
 // error text can quote what the token holds (YAML quotes the start of a
-// value it cannot convert), so none of it may reach the error details.
+// value it cannot convert), so none of it may reach the error details or
+// the logs.
 func TestStartWithABadTokenKeepsItOutOfTheErrorDetails(t *testing.T) {
 	t.Cleanup(func() { Stop(); ClearLogs() })
 	key, err := GenerateNodeKey()
@@ -178,7 +179,11 @@ func TestStartWithABadTokenKeepsItOutOfTheErrorDetails(t *testing.T) {
 		t.Fatal("Start accepted a token that is not valid YAML")
 	}
 	if !strings.Contains(RecentLogs(), "ERROR") {
-		t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
+		t.Errorf("logs do not record the failure:\n%s", RecentLogs())
+	}
+	// YAML cuts the quoted value short, so look for its start only.
+	if strings.Contains(RecentLogs(), "secret") {
+		t.Errorf("logs quote the token:\n%s", RecentLogs())
 	}
 	if got := rememberedDetail(); got != "" {
 		t.Errorf("error details = %q for a config failure, want none", got)

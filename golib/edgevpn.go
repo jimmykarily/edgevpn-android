@@ -162,7 +162,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeKey = append([]byte(nil), nodeKey...)
 	if _, err := crypto.UnmarshalPrivateKey(nodeKey); err != nil {
 		closeTunOnError("invalid node key")
-		failWithoutDetail(reasonKey, fmt.Sprintf("invalid node key: %v", err))
+		failWithoutDetail(reasonKey, "invalid node key", err)
 		return fmt.Errorf("invalid node key: %w", err)
 	}
 
@@ -173,7 +173,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
 		closeTunOnError("config error")
-		failWithoutDetail(reasonKey, fmt.Sprintf("config error: %v", err))
+		failWithoutDetail(reasonKey, "config error", err)
 		return fmt.Errorf("config error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
@@ -197,7 +197,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	n, err := node.New(nodeOpts...)
 	if err != nil {
 		closeTunOnError("node create error")
-		failWithoutDetail(reasonStart, fmt.Sprintf("node create error: %v", err))
+		failWithoutDetail(reasonStart, "node create error", err)
 		return fmt.Errorf("node create error: %w", err)
 	}
 
