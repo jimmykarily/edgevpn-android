@@ -81,8 +81,13 @@ android {
         // replacing it. It is signed with the release key so each preview
         // installs over the previous one: the phone refuses an update signed
         // with a different key, and every CI runner has its own debug key.
+        // It is not debuggable, because it goes on real phones: on a
+        // debuggable app anyone with USB debugging can read the app's files
+        // with run-as and dump its memory, where the network key sits
+        // decrypted while the VPN runs. The tests use the debug build.
         create("preview") {
             initWith(getByName("debug"))
+            isDebuggable = false
             applicationIdSuffix = ".preview"
             versionNameSuffix = "-preview"
             manifestPlaceholders["appLabel"] = "EdgeVPN preview"

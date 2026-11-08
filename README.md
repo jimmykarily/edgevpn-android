@@ -141,7 +141,7 @@ To use your own Android SDK instead of downloading: `make ANDROID_HOME=/path/to/
 
 Two GitHub Actions workflows build APKs that install on a phone:
 
-- **Preview** (`.github/workflows/preview.yml`) runs on every pull request and every push to `main`. The run's summary page has an "Install on a phone" link to the APK, which a phone's browser can download and install directly. The preview is a debug build named "EdgeVPN preview" with the application id `com.kairos.edgevpn.preview`, so it installs next to a released app instead of replacing it. Previews are kept for 14 days.
+- **Preview** (`.github/workflows/preview.yml`) runs on every pull request and every push to `main`. The run's summary page has an "Install on a phone" link to the APK, which a phone's browser can download and install directly. The preview is a debug build, but not debuggable, named "EdgeVPN preview" with the application id `com.kairos.edgevpn.preview`, so it installs next to a released app instead of replacing it. Previews are kept for 14 days.
 - **Release** (`.github/workflows/release.yml`) runs when a tag starting with `v` is pushed, for example `v0.2.0`. It builds a release APK whose version comes from the tag (`0.2.0`, version code `200`), and attaches it to a GitHub release named after the tag, using the tag's message as release notes. Each part of the version must be under 100.
 
 ```bash
