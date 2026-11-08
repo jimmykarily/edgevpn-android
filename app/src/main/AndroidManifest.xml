@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -12,8 +13,13 @@
         android:name="android.hardware.camera"
         android:required="false" />
 
+    <!-- No backups: the settings file is encrypted with a key that the Android keystore keeps
+         on this phone and never backs up, so a restored copy cannot be decrypted. The data
+         extraction rules keep it out of the copy to a new phone too. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:targetApi="31"
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.EdgeVPN">

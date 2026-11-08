@@ -2,11 +2,15 @@ package com.kairos.edgevpn
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import java.io.IOException
+import java.security.GeneralSecurityException
 
 object TokenStore {
 
+    private const val TAG = "EdgeVPN"
     private const val FILE_NAME = "edgevpn_secure_prefs"
     private const val KEY_TOKEN = "vpn_token"
 
@@ -25,7 +29,33 @@ object TokenStore {
         }
     }
 
-    private fun open(context: Context): SharedPreferences {
+    /** Makes the next call open the file again, as a new process would. For tests. */
+    internal fun openAgain() {
+        synchronized(this) { cached = null }
+    }
+
+    /**
+     * Opens the file, or deletes it and starts with an empty one when it cannot be decrypted.
+     * That happens to a file restored from a backup or moved to another phone: its key lives in
+     * the Android keystore of the phone that wrote it and never leaves that phone. The network
+     * key and the node key are lost then, and the user joins the network again.
+     */
+    private fun open(context: Context): SharedPreferences = try {
+        create(context)
+    } catch (e: GeneralSecurityException) {
+        startOver(context, e)
+    } catch (e: IOException) {
+        startOver(context, e)
+    }
+
+    private fun startOver(context: Context, e: Exception): SharedPreferences {
+        // Only the exception's class, so nothing read from the file can reach the log.
+        Log.w(TAG, "Could not decrypt the settings (${e.javaClass.simpleName}); deleting them and starting fresh")
+        context.deleteSharedPreferences(FILE_NAME)
+        return create(context)
+    }
+
+    private fun create(context: Context): SharedPreferences {
         val masterKey = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         return EncryptedSharedPreferences.create(
             FILE_NAME,
