@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.net.VpnService
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -56,9 +55,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "EdgeVPN"
         private const val POLL_MS = 2000L
-
-        /** Set by the Join screen after it saved a key: start the VPN now. */
-        const val EXTRA_CONNECT = "connect"
     }
 
     private lateinit var statusCardBody: View
@@ -164,20 +160,18 @@ class MainActivity : AppCompatActivity() {
         }
         seeLogsButton.setOnClickListener { openLogs() }
         changeAddressButton.setOnClickListener { openSettings() }
-        if (savedInstanceState == null) connectIfAsked(intent)
+        connectIfAsked()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        connectIfAsked(intent)
+        connectIfAsked()
     }
 
     /** Joining a network sends the user here to start the VPN with the new key. */
-    private fun connectIfAsked(intent: Intent) {
-        if (!intent.getBooleanExtra(EXTRA_CONNECT, false)) return
-        intent.removeExtra(EXTRA_CONNECT)
-        if (!EdgeVpnService.isRunning) connect()
+    private fun connectIfAsked() {
+        if (ConnectRequest.take() && !EdgeVpnService.isRunning) connect()
     }
 
     override fun onStart() {
@@ -229,7 +223,7 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, JoinActivity::class.java))
             return
         }
-        val intent = VpnService.prepare(this)
+        val intent = VpnStarter.prepare(this)
         if (intent != null) {
             vpnPermissionLauncher.launch(intent)
         } else {
@@ -238,9 +232,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startVpnService() {
-        startForegroundService(
-            Intent(this, EdgeVpnService::class.java).setAction(EdgeVpnService.ACTION_CONNECT)
-        )
+        VpnStarter.start(this)
         handler.postDelayed(refreshSoon, 300)
     }
 

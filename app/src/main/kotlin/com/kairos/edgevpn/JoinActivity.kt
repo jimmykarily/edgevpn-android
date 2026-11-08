@@ -118,10 +118,10 @@ class JoinActivity : AppCompatActivity() {
 
     /** Goes back to the main screen, closing the screens above it, and starts the VPN if asked. */
     private fun openMain(connect: Boolean) {
+        if (connect) ConnectRequest.ask()
         startActivity(
             Intent(this, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(MainActivity.EXTRA_CONNECT, connect)
         )
         finish()
     }
