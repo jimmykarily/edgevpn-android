@@ -14,13 +14,14 @@ import (
 // address is this device's VPN address, whose /24 the address factory
 // leaves out.
 //
-// NoTransports clears libp2p's default set, then the app adds back TCP with
-// a protected dialer, so every socket fd is passed through
-// VpnService.protect() before connect. That keeps the VPN's own
+// NoTransports clears libp2p's default set, then the app adds back TCP and
+// QUIC with protected sockets, so every socket fd is passed through
+// VpnService.protect() before connect or bind. That keeps the VPN's own
 // control-plane sockets from being routed back into the TUN interface. On
-// Android the dialer creates the socket, protects it, then connects, which
-// guarantees protect() runs before connect (otherwise connect fails with
-// "operation not permitted").
+// Android the TCP dialer creates the socket, protects it, then connects,
+// which guarantees protect() runs before connect (otherwise connect fails
+// with "operation not permitted"). QUIC runs over UDP, where hole punching
+// through NAT works far more often than over TCP.
 func hostOptions(address string) []libp2p.Option {
 	protectedDialerForAddr := func(_ ma.Multiaddr) (tcp.ContextDialer, error) {
 		if runtime.GOOS == "android" {
@@ -28,7 +29,7 @@ func hostOptions(address string) []libp2p.Option {
 		}
 		return &loggingDialer{d: ProtectedDialer()}, nil
 	}
-	return []libp2p.Option{
+	opts := []libp2p.Option{
 		libp2p.NoTransports,
 		libp2p.Transport(tcp.NewTCPTransport,
 			tcp.WithDialerForAddr(protectedDialerForAddr),
@@ -42,6 +43,8 @@ func hostOptions(address string) []libp2p.Option {
 		libp2p.ListenAddrStrings(
 			"/ip4/0.0.0.0/tcp/0",
 			"/ip6/::/tcp/0",
+			"/ip4/0.0.0.0/udp/0/quic-v1",
+			"/ip6/::/udp/0/quic-v1",
 		),
 		// Disable NATPortMap which is in edgevpn's defaultLibp2pOptions.
 		// On Android, the netroute call inside NAT gateway discovery is
@@ -62,4 +65,5 @@ func hostOptions(address string) []libp2p.Option {
 		// Android.
 		libp2p.AddrsFactory(newAddrsFactory(vpnSubnet(address), anet.InterfaceAddrs)),
 	}
+	return append(opts, quicTransportOptions()...)
 }
