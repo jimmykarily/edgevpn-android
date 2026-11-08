@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	libp2p "github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/wlynxg/anet"
@@ -64,6 +65,9 @@ func hostOptions(address string) []libp2p.Option {
 		// sendto() instead of bind() on the netlink socket and works on
 		// Android.
 		libp2p.AddrsFactory(newAddrsFactory(vpnSubnet(address), anet.InterfaceAddrs)),
+		// edgevpn turns hole punching on as well (networkConfig sets
+		// HolePunch); this option comes later and adds the tracer.
+		libp2p.EnableHolePunching(holepunch.WithTracer(holePunchLogger{})),
 	}
 	return append(opts, quicTransportOptions()...)
 }
