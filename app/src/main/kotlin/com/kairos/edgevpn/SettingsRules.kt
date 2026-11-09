@@ -19,3 +19,11 @@ fun addressChange(current: String, entered: String, vpnRunning: Boolean): Addres
         else -> AddressChange.SAVE
     }
 }
+
+/**
+ * Whether switching "Relay for other devices" to [chosen] asks the user to reconnect. The relay
+ * service is set up when the VPN starts, so a running VPN keeps the value it started with,
+ * [runningWith], until it reconnects.
+ */
+fun relayChangeAsksReconnect(vpnRunning: Boolean, runningWith: Boolean, chosen: Boolean): Boolean =
+    vpnRunning && runningWith != chosen

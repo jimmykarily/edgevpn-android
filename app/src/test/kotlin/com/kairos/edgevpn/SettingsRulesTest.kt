@@ -1,6 +1,8 @@
 package com.kairos.edgevpn
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsRulesTest {
@@ -37,5 +39,14 @@ class SettingsRulesTest {
     fun newAddressAsksToReconnectOnlyWhileTheVpnRuns() {
         assertEquals(AddressChange.SAVE, addressChange("10.1.0.2", "10.1.0.3", vpnRunning = false))
         assertEquals(AddressChange.SAVE_AND_ASK_RECONNECT, addressChange("10.1.0.2", "10.1.0.3", vpnRunning = true))
+    }
+
+    @Test
+    fun relayChangeAsksToReconnectOnlyWhenTheRunningVpnStartedWithTheOtherValue() {
+        assertFalse(relayChangeAsksReconnect(vpnRunning = false, runningWith = false, chosen = true))
+        assertTrue(relayChangeAsksReconnect(vpnRunning = true, runningWith = false, chosen = true))
+        assertTrue(relayChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = false))
+        // Switched back before reconnecting: the VPN already runs with this value.
+        assertFalse(relayChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = true))
     }
 }

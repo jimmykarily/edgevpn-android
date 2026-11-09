@@ -50,7 +50,7 @@ func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	// A phone with a public address would otherwise carry relayed traffic
 	// for any libp2p node on the internet, on the user's data plan.
 	if !cfg.Connection.RelayService.Disabled {
-		t.Error("Connection.RelayService.Disabled = false, want true so the phone never relays for others")
+		t.Error("Connection.RelayService.Disabled = false, want true so the phone relays for nobody unless the user turns it on")
 	}
 	// The app runs mDNS itself, only on Wi-Fi or Ethernet (see mdns.go).
 	if cfg.Discovery.MDNS {

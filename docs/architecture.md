@@ -16,4 +16,4 @@ The network key and the node key (the libp2p identity, which fixes the phone's p
 
 ## Settings that differ from edgevpn's defaults
 
-The library starts edgevpn in low profile mode, announces and syncs the ledger every 10 seconds, and enforces ledger ownership, so a node can only change entries it signed itself. The comments in `golib/edgevpn.go` give the reason for each setting.
+The library starts edgevpn in low profile mode, announces and syncs the ledger every 10 seconds, and enforces ledger ownership, so a node can only change entries it signed itself. The libp2p relay service, which lets other peers pass connections through this node, is off unless the user turns on "Relay for other devices" in Settings. When on, it uses go-libp2p's default limits (128 KiB and 2 minutes per relayed connection, 16 circuits per peer, reservations for 1 hour) instead of edgevpn's much larger ones, and it is open to any peer. The comments in `golib/edgevpn.go` give the reason for each setting.

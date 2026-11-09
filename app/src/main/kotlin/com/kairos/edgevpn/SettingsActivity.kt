@@ -54,6 +54,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var nameValue: TextView
     private lateinit var addressValue: TextView
     private lateinit var detailedLogsSwitch: MaterialSwitch
+    private lateinit var relayForOthersSwitch: MaterialSwitch
     private lateinit var phoneIdValue: TextView
 
     /** The full phone ID, once it has been read. */
@@ -79,11 +80,13 @@ class SettingsActivity : AppCompatActivity() {
         nameValue = findViewById(R.id.nameValue)
         addressValue = findViewById(R.id.addressValue)
         detailedLogsSwitch = findViewById(R.id.detailedLogsSwitch)
+        relayForOthersSwitch = findViewById(R.id.relayForOthersSwitch)
         phoneIdValue = findViewById(R.id.phoneIdValue)
 
         helpIcon(R.id.nameTitle, HelpTerm.NAME)
         helpIcon(R.id.addressTitle, HelpTerm.ADDRESS)
         helpIcon(R.id.detailedLogsTitle, HelpTerm.DETAILED_LOGS)
+        helpIcon(R.id.relayForOthersTitle, HelpTerm.RELAY_FOR_OTHERS)
         helpIcon(R.id.phoneIdTitle, HelpTerm.PHONE_ID)
         helpIcon(R.id.startFreshTitle, HelpTerm.START_FRESH)
 
@@ -95,6 +98,7 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, LogsActivity::class.java))
         }
         findViewById<View>(R.id.detailedLogsRow).setOnClickListener { detailedLogsSwitch.toggle() }
+        findViewById<View>(R.id.relayForOthersRow).setOnClickListener { relayForOthersSwitch.toggle() }
         findViewById<View>(R.id.phoneIdRow).setOnClickListener { copyPhoneId() }
         findViewById<View>(R.id.startFreshRow).setOnClickListener { confirmStartFresh() }
 
@@ -102,6 +106,16 @@ class SettingsActivity : AppCompatActivity() {
         detailedLogsSwitch.setOnCheckedChangeListener { _, on ->
             AppSettings.setDetailedLogs(this, on)
             Edgevpn.setDetailedLogs(on)
+        }
+
+        // Only the service passes this to Go, before each start, so Edgevpn.relayForOthers()
+        // is the value the running VPN started with.
+        relayForOthersSwitch.isChecked = AppSettings.relayForOthers(this)
+        relayForOthersSwitch.setOnCheckedChangeListener { _, on ->
+            AppSettings.setRelayForOthers(this, on)
+            if (relayChangeAsksReconnect(EdgeVpnService.isRunning, Edgevpn.relayForOthers(), on)) {
+                handler.post { askReconnect(R.string.reconnect_setting_text) }
+            }
         }
 
         val libraryVersion = Edgevpn.libraryVersion().removePrefix("v")
@@ -192,7 +206,7 @@ class SettingsActivity : AppCompatActivity() {
                 AddressChange.SAVE -> AppSettings.setAddress(this, entered.trim())
                 AddressChange.SAVE_AND_ASK_RECONNECT -> {
                     AppSettings.setAddress(this, entered.trim())
-                    handler.post { askReconnect() }
+                    handler.post { askReconnect(R.string.reconnect_text) }
                 }
             }
             renderPhone()
@@ -200,10 +214,10 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun askReconnect() {
+    private fun askReconnect(message: Int) {
         show(
             MaterialAlertDialogBuilder(this)
-                .setMessage(R.string.reconnect_text)
+                .setMessage(message)
                 .setNegativeButton(R.string.reconnect_later, null)
                 .setPositiveButton(R.string.reconnect_confirm) { _, _ -> reconnect() }
         )
@@ -339,7 +353,11 @@ class SettingsActivity : AppCompatActivity() {
                 Log.w(TAG, "Could not read the network snapshot", e)
                 return@showHelp emptyList()
             }
-            liveValues(term, model, null, PhoneFacts(detailedLogs = AppSettings.detailedLogs(this)))
+            val facts = PhoneFacts(
+                detailedLogs = AppSettings.detailedLogs(this),
+                relayForOthers = AppSettings.relayForOthers(this),
+            )
+            liveValues(term, model, null, facts)
         }
     }
 }

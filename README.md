@@ -82,7 +82,7 @@ The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `an
 
 ## Screen tests
 
-The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, the warning when another device uses the phone's address, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
+The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, the warning when another device uses the phone's address, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs and Relay for other devices switches in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
 
 ```bash
 make emu-up   # start the emulator, once

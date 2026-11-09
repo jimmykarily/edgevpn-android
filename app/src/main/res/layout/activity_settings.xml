@@ -276,6 +276,40 @@
                     <View style="@style/Widget.EdgeVPN.SettingsDivider" />
 
                     <LinearLayout
+                        android:id="@+id/relayForOthersRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_sync" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/relayForOthersTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_relay_for_others"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:id="@+id/relayForOthersSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_relay_for_others_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/relayForOthersSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp" />
+                    </LinearLayout>
+
+                    <View style="@style/Widget.EdgeVPN.SettingsDivider" />
+
+                    <LinearLayout
                         android:id="@+id/phoneIdRow"
                         style="@style/Widget.EdgeVPN.SettingsRow">
 

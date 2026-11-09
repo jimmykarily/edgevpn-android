@@ -9,6 +9,7 @@ object AppSettings {
     private const val KEY_ADDRESS = "address"
     private const val KEY_NAME = "name"
     private const val KEY_DETAILED_LOGS = "detailed_logs"
+    private const val KEY_RELAY_FOR_OTHERS = "relay_for_others"
     private const val KEY_EXTRA_PEERS = "extra_peers"
     private const val KEY_CHECK_IN_SECONDS = "check_in_seconds"
     private const val DEFAULT_ADDRESS = "10.1.0.2"
@@ -34,6 +35,14 @@ object AppSettings {
 
     fun setDetailedLogs(c: Context, v: Boolean) {
         TokenStore.prefs(c).edit().putBoolean(KEY_DETAILED_LOGS, v).apply()
+    }
+
+    /** Whether the phone offers the libp2p relay service to other devices, for Edgevpn.setRelayForOthers. */
+    fun relayForOthers(c: Context): Boolean =
+        TokenStore.prefs(c).getBoolean(KEY_RELAY_FOR_OTHERS, false)
+
+    fun setRelayForOthers(c: Context, v: Boolean) {
+        TokenStore.prefs(c).edit().putBoolean(KEY_RELAY_FOR_OTHERS, v).apply()
     }
 
     /**
