@@ -2,9 +2,9 @@
 
 An Android app that joins a phone to an [EdgeVPN](https://github.com/mudler/edgevpn) network. EdgeVPN is a peer-to-peer VPN built on [libp2p](https://libp2p.io): the devices in a network find each other through local discovery (mDNS) and a public internet-wide directory (the libp2p DHT), and send their traffic to each other directly, with no central server. Every device in a network shares one network key, a base64 string that `edgevpn -g -b` generates.
 
-With the app, a phone gets an address in the VPN, shows the other devices of the network and whether it can reach them, and keeps the connection up when it moves between Wi-Fi and mobile data. Android 8 (API 26) or newer is needed.
+With the app, a phone gets an address in the VPN, shows the other devices of the network and whether it can reach them, and reconnects by itself when it moves between Wi-Fi and mobile data. Android 8 (API 26) or newer is needed.
 
-The app is young. It works on Wi-Fi and is being tested on mobile data; see [Current status](#current-status) and [Known limitations](#known-limitations).
+The app is young. It works on Wi-Fi and on mobile data, but a switch from Wi-Fi to mobile data can interrupt the VPN for a few minutes; see [Current status](#current-status) and [Known limitations](#known-limitations).
 
 ## Install
 
@@ -208,10 +208,11 @@ Without these variables, `make preview` signs with the local debug key and `make
 
 ## Current status
 
-The phone joins an EdgeVPN network, appears in the web UI and routes traffic over Wi-Fi. Reliable operation on mobile data and across network changes is tracked in [issue #1](https://github.com/jimmykarily/edgevpn-android/issues/1).
+The phone joins an EdgeVPN network, appears in the web UI and routes traffic over Wi-Fi and over mobile data. On mobile data it reached a desktop at home directly over IPv6, because that carrier lets incoming IPv6 reach the phone. This was checked on one phone with one carrier. On a carrier that blocks incoming connections, the phone depends on relays and hole punching, which is untested on a real phone. Faster recovery after a network switch is tracked in [issue #1](https://github.com/jimmykarily/edgevpn-android/issues/1).
 
 ## Known limitations
 
+- **A switch from Wi-Fi to mobile data interrupts the VPN for minutes.** When the phone leaves Wi-Fi, VPN traffic stopped for about 4 minutes (237 seconds, one run on one phone) before it came back on mobile data by itself. The phone redialled within seconds, but the home router blocked incoming connections to the desktop, so the phone reached it only through a relay, which carries no VPN traffic. The direct connection came back when the desktop dialled the phone's new address, most likely after its next search of the public directory (every 3 minutes). Shortening this is tracked in [issue #1](https://github.com/jimmykarily/edgevpn-android/issues/1).
 - **No local discovery over the phone's own hotspot.** mDNS, the local discovery that finds devices on the same Wi-Fi, runs only on Wi-Fi and Ethernet networks the phone has joined. A laptop connected to the phone's hotspot is not found that way. It can still find the phone through the internet, like a device anywhere else, but that search is slower: about 5 minutes in our tests. The reason is that Android gives apps no public way to learn whether the hotspot is on or which network interface it uses (the tethering API is for system apps only). Without that, the app cannot tell the hotspot apart from mobile data, and mDNS stays off mobile data on purpose: no device there is meant to be reached, and on some devices, such as the emulator, mobile data does carry multicast.
 
 ## Reporting a security problem
