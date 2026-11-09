@@ -105,3 +105,15 @@ fun withTextBeforeHelpIcon(expected: String): Matcher<View> = object : BoundedMa
 
 /** What appendHelpIcon adds after the words: a non-breaking space and the icon's placeholder. */
 private const val HELP_ICON = "\u00A0\uFFFC"
+
+/**
+ * Espresso's replaceText, for text that must stay out of logcat, such as a network key. Espresso
+ * logs every action with its description, and replaceText's description holds the whole text. CI
+ * uploads that logcat with the test reports.
+ */
+fun replaceSecretText(text: String): ViewAction {
+    val replace = androidx.test.espresso.action.ViewActions.replaceText(text)
+    return object : ViewAction by replace {
+        override fun getDescription() = "replace text with a secret of ${text.length} characters"
+    }
+}

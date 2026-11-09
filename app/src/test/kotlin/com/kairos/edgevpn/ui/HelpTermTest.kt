@@ -34,7 +34,7 @@ class HelpTermTest {
 
     @Test
     fun oneTermPerGlossaryRow() {
-        assertEquals(22, HelpTerm.values().size)
+        assertEquals(23, HelpTerm.values().size)
     }
 
     @Test
@@ -168,6 +168,13 @@ class HelpTermTest {
     }
 
     @Test
+    fun relayForOthersShowsWhetherItIsOn() {
+        val facts = PhoneFacts(relayForOthers = false)
+        assertEquals(listOf("Relay for other devices" to "Off"), liveValues(HelpTerm.RELAY_FOR_OTHERS, model, null, facts))
+        assertTrue(liveValues(HelpTerm.RELAY_FOR_OTHERS, model, null).isEmpty())
+    }
+
+    @Test
     fun durationsUsePlainUnits() {
         assertEquals("3 s", durationText(3))
         assertEquals("48 s", durationText(48))
@@ -198,6 +205,7 @@ class HelpTermTest {
             HelpTerm.NAME to LiveScope.PHONE,
             HelpTerm.ADDRESS to LiveScope.PHONE,
             HelpTerm.DETAILED_LOGS to LiveScope.PHONE,
+            HelpTerm.RELAY_FOR_OTHERS to LiveScope.PHONE,
             HelpTerm.PHONE_ID to LiveScope.PHONE,
             HelpTerm.START_FRESH to LiveScope.PHONE,
             HelpTerm.ADDRESS_IN_USE to LiveScope.PHONE,

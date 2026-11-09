@@ -197,3 +197,30 @@ func TestHandleNodeExitClearsHostReady(t *testing.T) {
 		t.Error("hostReady survives the node exit")
 	}
 }
+
+// The errors passed to failWithoutDetail can quote the network key, so
+// neither the Problem sheet nor the log buffer, which also feeds logcat and
+// the Logs screen, may hold their text. The log keeps what failed and the
+// error's type, which is enough to tell a YAML error from a key error.
+func TestFailWithoutDetailKeepsTheErrorTextOutOfTheLogs(t *testing.T) {
+	t.Cleanup(func() { Stop(); ClearLogs() })
+	ClearLogs()
+	const secret = "secret-room-name"
+	mu.Lock()
+	failWithoutDetail(reasonKey, "config error", errors.New("cannot read "+secret))
+	mu.Unlock()
+
+	logs := RecentLogs()
+	if strings.Contains(logs, secret) {
+		t.Errorf("logs quote the error text:\n%s", logs)
+	}
+	if !strings.Contains(logs, "ERROR") || !strings.Contains(logs, "config error") || !strings.Contains(logs, "*errors.errorString") {
+		t.Errorf("logs do not say what failed and the error's type:\n%s", logs)
+	}
+	if got := rememberedFailure(); got != reasonKey {
+		t.Errorf("failure = %q, want %q", got, reasonKey)
+	}
+	if got := rememberedDetail(); got != "" {
+		t.Errorf("error details = %q, want none", got)
+	}
+}

@@ -39,7 +39,7 @@ class AddressRulesTest {
     fun aLocalNetworkOutsideTheVpnRangeDoesNotClash() {
         assertFalse(clashesWithVpn("10.1.0.2", listOf(LinkPrefix("192.168.21.35", 23))))
         assertFalse(clashesWithVpn("10.1.0.2", listOf(LinkPrefix("10.1.1.35", 24))))
-        assertFalse(clashesWithVpn("192.168.2.4", listOf(LinkPrefix("192.168.20.20", 23))))
+        assertFalse(clashesWithVpn("192.168.22.4", listOf(LinkPrefix("192.168.20.20", 23))))
         assertFalse(clashesWithVpn("10.1.0.2", emptyList()))
     }
 

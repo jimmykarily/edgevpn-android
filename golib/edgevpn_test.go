@@ -47,6 +47,11 @@ func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	if !cfg.Discovery.DHT {
 		t.Error("Discovery.DHT = false, want true")
 	}
+	// A phone with a public address would otherwise carry relayed traffic
+	// for any libp2p node on the internet, on the user's data plan.
+	if !cfg.Connection.RelayService.Disabled {
+		t.Error("Connection.RelayService.Disabled = false, want true so the phone relays for nobody unless the user turns it on")
+	}
 	// The app runs mDNS itself, only on Wi-Fi or Ethernet (see mdns.go).
 	if cfg.Discovery.MDNS {
 		t.Error("Discovery.MDNS = true, want false so edgevpn does not start its own mDNS")
@@ -149,7 +154,8 @@ func TestStartWithAnUnusableDescriptorRemembersAPlainReason(t *testing.T) {
 
 // A token that edgevpn cannot read fails when the node is created, and the
 // error text can quote what the token holds (YAML quotes the start of a
-// value it cannot convert), so none of it may reach the error details.
+// value it cannot convert), so none of it may reach the error details or
+// the logs.
 func TestStartWithABadTokenKeepsItOutOfTheErrorDetails(t *testing.T) {
 	t.Cleanup(func() { Stop(); ClearLogs() })
 	key, err := GenerateNodeKey()
@@ -173,7 +179,11 @@ func TestStartWithABadTokenKeepsItOutOfTheErrorDetails(t *testing.T) {
 		t.Fatal("Start accepted a token that is not valid YAML")
 	}
 	if !strings.Contains(RecentLogs(), "ERROR") {
-		t.Errorf("logs do not hold the raw error:\n%s", RecentLogs())
+		t.Errorf("logs do not record the failure:\n%s", RecentLogs())
+	}
+	// YAML cuts the quoted value short, so look for its start only.
+	if strings.Contains(RecentLogs(), "secret") {
+		t.Errorf("logs quote the token:\n%s", RecentLogs())
 	}
 	if got := rememberedDetail(); got != "" {
 		t.Errorf("error details = %q for a config failure, want none", got)

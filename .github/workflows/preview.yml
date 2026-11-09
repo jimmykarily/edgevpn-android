@@ -11,6 +11,11 @@ concurrency:
   group: preview-${{ github.ref }}
   cancel-in-progress: true
 
+# The token only checks out the repository. The cache and the artifact upload
+# use the runner's own token, and the run summary needs no token at all.
+permissions:
+  contents: read
+
 jobs:
   # An APK for every pull request and every push to main, to install on a
   # phone straight from the run's summary page. It is the preview build type

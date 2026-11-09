@@ -16,13 +16,24 @@ import (
 // leaves out.
 //
 // NoTransports clears libp2p's default set, then the app adds back TCP and
-// QUIC with protected sockets, so every socket fd is passed through
-// VpnService.protect() before connect or bind. That keeps the VPN's own
-// control-plane sockets from being routed back into the TUN interface. On
-// Android the TCP dialer creates the socket, protects it, then connects,
-// which guarantees protect() runs before connect (otherwise connect fails
-// with "operation not permitted"). QUIC runs over UDP, where hole punching
-// through NAT works far more often than over TCP.
+// QUIC with protected sockets: outgoing TCP sockets and QUIC's UDP sockets
+// are passed through VpnService.protect() before connect or bind. That keeps
+// the VPN's own control-plane sockets from being routed back into the TUN
+// interface. On Android the TCP dialer creates the socket, protects it, then
+// connects, which guarantees protect() runs before connect (otherwise
+// connect fails with "operation not permitted"). QUIC runs over UDP, where
+// hole punching through NAT works far more often than over TCP.
+//
+// Two kinds of socket are not protected. The TCP listening sockets on
+// 0.0.0.0 and :: come from go-libp2p's TCP transport, which has a hook for
+// the dialer but none for the listener, and connections accepted on them are
+// not protected either. The mDNS multicast sockets are opened by the
+// zeroconf library inside edgevpn. This is harmless because the VPN routes
+// only its own /24 into the tunnel, so traffic from these sockets to any
+// other address leaves through Wi-Fi or mobile data as usual. The exception
+// is a local network that overlaps the VPN's /24: replies to a peer on it
+// would go into the tunnel. The app warns the user about that overlap
+// (SetLocalNetworkClash).
 func hostOptions(address string) []libp2p.Option {
 	protectedDialerForAddr := func(_ ma.Multiaddr) (tcp.ContextDialer, error) {
 		if runtime.GOOS == "android" {

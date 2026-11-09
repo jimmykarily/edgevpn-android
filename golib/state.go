@@ -2,6 +2,7 @@ package edgevpn
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -92,7 +93,8 @@ func ReportStartFailure(reason string) {
 }
 
 // The reasons the app shows when the VPN cannot run. The raw errors go to
-// the logs only.
+// the logs only, and errors that can quote the network key do not go
+// anywhere (see failWithoutDetail).
 const (
 	reasonKey     = "The network key could not be used."
 	reasonStart   = "The VPN could not start."
@@ -102,14 +104,17 @@ const (
 // fail logs the raw error and remembers the plain reason for the app, and
 // the raw error as its details. The caller must hold mu.
 func fail(reason, raw string) {
-	failWithoutDetail(reason, raw)
+	emit("ERROR", raw)
+	recordFailure(reason)
 	failureDetail = raw
 }
 
 // failWithoutDetail is fail for errors that can quote the network key, such
-// as those of reading the key and creating the node from it: the raw error
-// goes to the log only. The caller must hold mu.
-func failWithoutDetail(reason, raw string) {
-	emit("ERROR", raw)
+// as those of reading the key and creating the node from it. The log buffer
+// feeds the Logs screen, its "Copy all" button and logcat, so it gets only
+// what failed and the Go type of err, never the error text. The caller must
+// hold mu.
+func failWithoutDetail(reason, what string, err error) {
+	emit("ERROR", fmt.Sprintf("%s (%T)", what, err))
 	recordFailure(reason)
 }

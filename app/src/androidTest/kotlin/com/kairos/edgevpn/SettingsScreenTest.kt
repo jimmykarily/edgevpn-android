@@ -4,6 +4,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -14,8 +15,11 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import edgevpn.Edgevpn
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.containsString
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -64,6 +68,35 @@ class SettingsScreenTest {
 
         ActivityScenario.launch(SettingsActivity::class.java).use {
             onView(withId(R.id.detailedLogsSwitch)).perform(nestedScrollTo()).check(matches(isChecked()))
+        }
+    }
+
+    @Test
+    fun relayForOthersIsOffAndTappingTheRowTurnsItOn() {
+        assertFalse(AppSettings.relayForOthers(context))
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.relayForOthersSwitch)).perform(nestedScrollTo()).check(matches(isNotChecked()))
+            // The subtitle, not the row: the middle of the row may be the (?) icon after the title.
+            onView(withId(R.id.relayForOthersSub)).perform(click())
+            onView(withId(R.id.relayForOthersSwitch)).check(matches(isChecked()))
+            // The VPN is off, so there is nothing to reconnect.
+            onView(withText("Reconnect now to apply this change?")).check(doesNotExist())
+        }
+        assertTrue(AppSettings.relayForOthers(context))
+
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.relayForOthersSwitch)).perform(nestedScrollTo()).check(matches(isChecked()))
+        }
+    }
+
+    @Test
+    fun relayForOthersHelpExplainsTheLimits() {
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.relayForOthersTitle)).perform(nestedScrollTo(), clickHelpIcon())
+
+            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Relay for other devices"))))
+            onView(withText(containsString("2 minutes or 128 KB"))).check(matches(isDisplayed()))
+            onView(withText("Technical details")).perform(nestedScrollTo()).check(matches(isDisplayed()))
         }
     }
 }

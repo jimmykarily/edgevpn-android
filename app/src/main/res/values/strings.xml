@@ -24,6 +24,8 @@
     <string name="setting_view_logs_sub">What the app has been doing, step by step.</string>
     <string name="setting_detailed_logs">Detailed logs</string>
     <string name="setting_detailed_logs_sub">Much more detail. Uses more battery, so turn it off when done.</string>
+    <string name="setting_relay_for_others">Relay for other devices</string>
+    <string name="setting_relay_for_others_sub">Helps other devices behind a router reach each other. Uses some data and battery.</string>
     <string name="setting_phone_id">Phone ID</string>
     <string name="setting_phone_id_sub">%1$s · tap to copy</string>
     <string name="phone_id_copied">Phone ID copied</string>
@@ -49,6 +51,7 @@
     <string name="reconnect_text">Reconnect now to use the new address?</string>
     <string name="reconnect_confirm">Reconnect</string>
     <string name="reconnect_later">Later</string>
+    <string name="reconnect_setting_text">Reconnect now to apply this change?</string>
     <string name="join_title">Join a network</string>
     <string name="join_hint">Paste the key here…</string>
     <string name="join_heading">Paste your network key</string>
@@ -208,6 +211,9 @@
     <string name="help_detailed_logs_title">Detailed logs</string>
     <string name="help_detailed_logs_plain">Writes much more detail to the logs, to help find problems. Uses more battery, so turn it off when done.</string>
     <string name="help_detailed_logs_tech">Sets the edgevpn log level to debug and the libp2p log level to debug. libp2p\'s lines go to logcat (tag GoLog), not to the in-app logs.</string>
+    <string name="help_relay_for_others_title">Relay for other devices</string>
+    <string name="help_relay_for_others_plain">Lets other devices on the internet pass the start of a connection through this phone, so that two devices behind home routers can find a direct path to each other. Any device that uses the same peer-to-peer system (libp2p) can use it, not only yours. It uses some data and battery. Each relayed connection is cut after 2 minutes or 128 KB, whichever comes first. It only works while this phone can be reached from the internet, for example on some Wi-Fi networks with IPv6.</string>
+    <string name="help_relay_for_others_tech">Runs the libp2p circuit relay v2 service with go-libp2p\'s default limits: 128 KiB per direction and 2 minutes per relayed connection, 16 circuits per peer, 128 reservations, a reservation TTL of 1 hour and a 2048 byte buffer per circuit. go-libp2p starts the service only while AutoNAT reports the phone as publicly reachable. Any peer may reserve a slot; there is no check that it belongs to your network. The service starts with the VPN, so a change applies after a reconnect.</string>
     <string name="help_phone_id_title">Phone ID</string>
     <string name="help_phone_id_plain">A unique identifier for this phone in your network.</string>
     <string name="help_phone_id_tech">The libp2p peer ID, derived from the phone\'s Ed25519 identity key. It signs this phone\'s ledger entries.</string>

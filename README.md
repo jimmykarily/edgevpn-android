@@ -1,14 +1,24 @@
 # EdgeVPN Android
 
-An Android client for [EdgeVPN](https://github.com/mudler/edgevpn), enabling mobile devices to join EdgeVPN networks.
+An Android app that joins a phone to an [EdgeVPN](https://github.com/mudler/edgevpn) network. EdgeVPN is a peer-to-peer VPN built on [libp2p](https://libp2p.io): the devices in a network find each other through local discovery (mDNS) and a public internet-wide directory (the libp2p DHT), and send their traffic to each other directly, with no central server. Every device in a network shares one network key, a base64 string that `edgevpn -g -b` generates.
 
-See [PLAN.md](PLAN.md) for architecture details and the full implementation roadmap.
+With the app, a phone gets an address in the VPN, shows the other devices of the network and whether it can reach them, and keeps the connection up when it moves between Wi-Fi and mobile data. Android 8 (API 26) or newer is needed.
 
-## Prerequisites
+The app is young. It works on Wi-Fi and is being tested on mobile data; see [Current status](#current-status) and [Known limitations](#known-limitations).
+
+## Install
+
+Download the APK of the latest [release](https://github.com/jimmykarily/edgevpn-android/releases) on the phone and open it. Android asks once to allow installs from the browser. Then open the app, paste the network key on the Join screen or scan it as a QR code, and turn the VPN on. The phone uses the VPN address `10.1.0.2` unless another one is set in Settings; every device in a network needs its own address.
+
+## How it works
+
+The VPN itself is edgevpn's Go code, compiled into the app with `gomobile bind`. The Kotlin side runs an Android `VpnService`: it creates the tunnel, hands its file descriptor to Go, and shows the state. The Go side (`golib/`) starts an edgevpn node, keeps the app's own libp2p sockets outside the tunnel with `VpnService.protect`, and reports the network's devices back to the app. [docs/architecture.md](docs/architecture.md) has more detail, and `docs/superpowers/` holds the design notes of larger changes.
+
+## Prerequisites for building
 
 - Go 1.26+
 - Linux x86_64 (build host)
-- USB-connected Android device (for `make install`)
+- An Android device over USB, only for `make install`
 
 Everything else (JDK 17, Android SDK/NDK, Gradle, gomobile) is downloaded automatically on first build.
 
@@ -16,19 +26,16 @@ Everything else (JDK 17, Android SDK/NDK, Gradle, gomobile) is downloaded automa
 
 ```
 edgevpn-android/
-├── Makefile                        # Build orchestration
-├── golib/                          # Go library (compiled to AAR via gomobile)
-│   ├── go.mod
-│   └── edgevpn.go                  # Exported API: Start(), Stop(), Status()
-├── app/                            # Android app (Kotlin)
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       └── kotlin/com/kairos/edgevpn/
-│           └── MainActivity.kt
-├── build.gradle.kts                # Root Gradle config
-├── settings.gradle.kts
-└── gradle.properties
+├── Makefile                 # Build orchestration
+├── golib/                   # Go library, compiled to an AAR with gomobile
+├── app/                     # Android app (Kotlin)
+│   └── src/
+│       ├── main/            # The app: VpnService, screens, settings
+│       ├── test/            # JVM unit tests
+│       └── androidTest/     # Screen tests and the network test helper
+├── scripts/                 # Emulator, test peer and network test scripts
+├── docs/                    # Architecture and design notes
+└── .github/workflows/       # CI: unit, screen and network tests, preview and release APKs
 ```
 
 ## Build
@@ -75,7 +82,7 @@ The Go library is built for the architectures in `GOMOBILE_TARGETS` (default `an
 
 ## Screen tests
 
-The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, the warning when another device uses the phone's address, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs switch in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
+The tests in `app/src/androidTest` open the real screens on an emulator and check what a person sees: the main screen when the VPN is off, looking, connected and failing, the warning when another device uses the phone's address, a device sheet and a help sheet, a cut-off key on the Join screen, the address check and the Detailed logs and Relay for other devices switches in Settings, and an empty Logs screen. They show the main screen from a chosen network snapshot (set through `NetworkSource`) instead of a running node, so they need no network key and never join a network. The Join test checks a made-up key that it builds itself.
 
 ```bash
 make emu-up   # start the emulator, once
@@ -134,7 +141,7 @@ To use your own Android SDK instead of downloading: `make ANDROID_HOME=/path/to/
 
 Two GitHub Actions workflows build APKs that install on a phone:
 
-- **Preview** (`.github/workflows/preview.yml`) runs on every pull request and every push to `main`. The run's summary page has an "Install on a phone" link to the APK, which a phone's browser can download and install directly. The preview is a debug build named "EdgeVPN preview" with the application id `com.kairos.edgevpn.preview`, so it installs next to a released app instead of replacing it. Previews are kept for 14 days.
+- **Preview** (`.github/workflows/preview.yml`) runs on every pull request and every push to `main`. The run's summary page has an "Install on a phone" link to the APK, which a phone's browser can download and install directly. The preview is a debug build, but not debuggable, named "EdgeVPN preview" with the application id `com.kairos.edgevpn.preview`, so it installs next to a released app instead of replacing it. Previews are kept for 14 days.
 - **Release** (`.github/workflows/release.yml`) runs when a tag starting with `v` is pushed, for example `v0.2.0`. It builds a release APK whose version comes from the tag (`0.2.0`, version code `200`), and attaches it to a GitHub release named after the tag, using the tag's message as release notes. Each part of the version must be under 100.
 
 ```bash
@@ -206,3 +213,11 @@ The phone joins an EdgeVPN network, appears in the web UI and routes traffic ove
 ## Known limitations
 
 - **No local discovery over the phone's own hotspot.** mDNS, the local discovery that finds devices on the same Wi-Fi, runs only on Wi-Fi and Ethernet networks the phone has joined. A laptop connected to the phone's hotspot is not found that way. It can still find the phone through the internet, like a device anywhere else, but that search is slower: about 5 minutes in our tests. The reason is that Android gives apps no public way to learn whether the hotspot is on or which network interface it uses (the tethering API is for system apps only). Without that, the app cannot tell the hotspot apart from mobile data, and mDNS stays off mobile data on purpose: no device there is meant to be reached, and on some devices, such as the emulator, mobile data does carry multicast.
+
+## Reporting a security problem
+
+Please do not open a public issue for a security problem. See [SECURITY.md](SECURITY.md).
+
+## License
+
+Apache License 2.0, the same as edgevpn. See [LICENSE](LICENSE).

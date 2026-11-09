@@ -81,8 +81,13 @@ android {
         // replacing it. It is signed with the release key so each preview
         // installs over the previous one: the phone refuses an update signed
         // with a different key, and every CI runner has its own debug key.
+        // It is not debuggable, because it goes on real phones: on a
+        // debuggable app anyone with USB debugging can read the app's files
+        // with run-as and dump its memory, where the network key sits
+        // decrypted while the VPN runs. The tests use the debug build.
         create("preview") {
             initWith(getByName("debug"))
+            isDebuggable = false
             applicationIdSuffix = ".preview"
             versionNameSuffix = "-preview"
             manifestPlaceholders["appLabel"] = "EdgeVPN preview"
@@ -120,7 +125,10 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // The QR decoder that zxing-android-embedded uses. 4.3.0 is its newest release and pulls
+    // zxing core 3.4.1 from 2021; the decoder reads camera frames, so it is kept current here.
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

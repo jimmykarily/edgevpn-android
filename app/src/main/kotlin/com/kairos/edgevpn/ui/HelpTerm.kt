@@ -3,8 +3,8 @@ package com.kairos.edgevpn.ui
 /** One term the app explains with a (?) help sheet, one per row of the glossary. */
 enum class HelpTerm {
     CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, YOUR_DEVICES, DIRECT, VIA_HELPER, OFFLINE,
-    SAME_NETWORK, FINDING, HELPERS, LAST_HEARD, NETWORK_KEY, NAME, ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH,
-    ADDRESS_IN_USE, LOCAL_NETWORK_CLASH;
+    SAME_NETWORK, FINDING, HELPERS, LAST_HEARD, NETWORK_KEY, NAME, ADDRESS, DETAILED_LOGS, RELAY_FOR_OTHERS, PHONE_ID,
+    START_FRESH, ADDRESS_IN_USE, LOCAL_NETWORK_CLASH;
 
     /** What the live values of this term describe, which names their heading in the sheet. */
     val liveScope: LiveScope
@@ -12,7 +12,7 @@ enum class HelpTerm {
             DIRECT, VIA_HELPER, OFFLINE, SAME_NETWORK -> LiveScope.CONNECTION
             YOUR_DEVICES, LAST_HEARD -> LiveScope.NETWORK
             CONNECTED, LOOKING, OFF, PROBLEM, THIS_PHONE, USING, FINDING, HELPERS, NETWORK_KEY, NAME,
-            ADDRESS, DETAILED_LOGS, PHONE_ID, START_FRESH, ADDRESS_IN_USE,
+            ADDRESS, DETAILED_LOGS, RELAY_FOR_OTHERS, PHONE_ID, START_FRESH, ADDRESS_IN_USE,
             LOCAL_NETWORK_CLASH -> LiveScope.PHONE
         }
 
@@ -35,7 +35,11 @@ val Badge.helpTerm: HelpTerm
     }
 
 /** Facts about this phone that the status snapshot does not carry. */
-data class PhoneFacts(val using: String? = null, val detailedLogs: Boolean? = null)
+data class PhoneFacts(
+    val using: String? = null,
+    val detailedLogs: Boolean? = null,
+    val relayForOthers: Boolean? = null,
+)
 
 /** A length of time in plain units: "48 s", "5 min", "2 h", "3 days". */
 fun durationText(seconds: Long): String = when (val ago = formatAgo(seconds)) {
@@ -105,6 +109,7 @@ fun liveValues(
             add("Route", routeOf(model.selfAddress))
         }
         HelpTerm.DETAILED_LOGS -> add("Detailed logs", phone.detailedLogs?.let { if (it) "On" else "Off" })
+        HelpTerm.RELAY_FOR_OTHERS -> add("Relay for other devices", phone.relayForOthers?.let { if (it) "On" else "Off" })
         HelpTerm.PHONE_ID -> add("Phone ID", model.selfId)
         HelpTerm.ADDRESS_IN_USE -> add("Address", model.selfAddress)
         HelpTerm.LOCAL_NETWORK_CLASH -> add("VPN route", routeOf(model.selfAddress))

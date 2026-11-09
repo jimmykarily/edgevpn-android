@@ -63,6 +63,7 @@ private fun texts(term: HelpTerm): HelpTexts = when (term) {
     HelpTerm.NAME -> HelpTexts(R.string.help_name_title, R.string.help_name_plain, R.string.help_name_tech)
     HelpTerm.ADDRESS -> HelpTexts(R.string.help_address_title, R.string.help_address_plain, R.string.help_address_tech)
     HelpTerm.DETAILED_LOGS -> HelpTexts(R.string.help_detailed_logs_title, R.string.help_detailed_logs_plain, R.string.help_detailed_logs_tech)
+    HelpTerm.RELAY_FOR_OTHERS -> HelpTexts(R.string.help_relay_for_others_title, R.string.help_relay_for_others_plain, R.string.help_relay_for_others_tech)
     HelpTerm.PHONE_ID -> HelpTexts(R.string.help_phone_id_title, R.string.help_phone_id_plain, R.string.help_phone_id_tech)
     HelpTerm.START_FRESH -> HelpTexts(R.string.help_start_fresh_title, R.string.help_start_fresh_plain, R.string.help_start_fresh_tech)
     HelpTerm.ADDRESS_IN_USE -> HelpTexts(R.string.help_address_in_use_title, R.string.help_address_in_use_plain, R.string.help_address_in_use_tech)

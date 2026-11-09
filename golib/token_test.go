@@ -25,6 +25,29 @@ func TestValidateToken(t *testing.T) {
 	}
 }
 
+// A key without an mDNS name cannot find devices on the same Wi-Fi, and one
+// without a positive message size gives pubsub a limit of zero bytes, so the
+// ledger never syncs. edgevpn always writes both into the keys it generates.
+func TestValidateTokenRejectsAKeyWithoutMDNSOrMessageSize(t *testing.T) {
+	const missing = "This key is missing parts EdgeVPN needs. Copy it again from a device that is already in the network."
+	noMDNS := node.GenerateNewConnectionData()
+	noMDNS.MDNS = ""
+	noSize := node.GenerateNewConnectionData()
+	noSize.MaxMessageSize = 0
+	negativeSize := node.GenerateNewConnectionData()
+	negativeSize.MaxMessageSize = -1
+	cases := map[string]*node.YAMLConnectionConfig{
+		"no mdns":                   noMDNS,
+		"no max_message_size":       noSize,
+		"negative max_message_size": negativeSize,
+	}
+	for name, cfg := range cases {
+		if got := ValidateToken(cfg.Base64()); got != missing {
+			t.Errorf("%s: ValidateToken = %q, want %q", name, got, missing)
+		}
+	}
+}
+
 func TestValidateTokenRejectsYAMLWithoutKeys(t *testing.T) {
 	tok := base64.StdEncoding.EncodeToString([]byte("room: x\n"))
 	if got := ValidateToken(tok); got != "This key is missing parts EdgeVPN needs. Copy it again from a device that is already in the network." {

@@ -90,9 +90,16 @@ func networkConfig(token, address string) config.Config {
 		// AutoRelay reserves a slot on a public circuit v2 relay and advertises
 		// /p2p-circuit addresses; HolePunch coordinates DCUtR to establish a direct
 		// connection once a relayed path exists.
+		//
+		// The relay service is the other side of AutoRelay: it lets other
+		// peers reserve a slot on this node. On a phone with a public
+		// address any libp2p node could then send traffic through it at the
+		// cost of the user's data and battery, so it is off unless the user
+		// turns it on (relay.go).
 		Connection: config.Connection{
-			AutoRelay: true,
-			HolePunch: true,
+			AutoRelay:    true,
+			HolePunch:    true,
+			RelayService: relayServiceConfig(),
 		},
 		// CLI defaults both of these to 10s (cmd/util.go). If left at zero, vpn's
 		// BackoffTicker(MaxInterval=0) misbehaves and the VPN service's
@@ -154,7 +161,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeKey = append([]byte(nil), nodeKey...)
 	if _, err := crypto.UnmarshalPrivateKey(nodeKey); err != nil {
 		closeTunOnError("invalid node key")
-		failWithoutDetail(reasonKey, fmt.Sprintf("invalid node key: %v", err))
+		failWithoutDetail(reasonKey, "invalid node key", err)
 		return fmt.Errorf("invalid node key: %w", err)
 	}
 
@@ -165,7 +172,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)
 	if err != nil {
 		closeTunOnError("config error")
-		failWithoutDetail(reasonKey, fmt.Sprintf("config error: %v", err))
+		failWithoutDetail(reasonKey, "config error", err)
 		return fmt.Errorf("config error: %w", err)
 	}
 	nodeOpts = append(nodeOpts, node.WithPrivKey(nodeKey))
@@ -189,7 +196,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	n, err := node.New(nodeOpts...)
 	if err != nil {
 		closeTunOnError("node create error")
-		failWithoutDetail(reasonStart, fmt.Sprintf("node create error: %v", err))
+		failWithoutDetail(reasonStart, "node create error", err)
 		return fmt.Errorf("node create error: %w", err)
 	}
 
