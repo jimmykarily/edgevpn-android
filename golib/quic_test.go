@@ -58,6 +58,20 @@ var _ = Describe("The QUIC transport", func() {
 		Expect(protector.calls.Load()).To(BeNumerically(">", 0), "no UDP socket went through protect")
 	})
 
+	// A hole punch opens the phone's firewall only for the port its punch
+	// packets leave from, and the peer dials the port the phone advertises.
+	// Dials and hole punches take their socket from the same place in
+	// go-libp2p (TransportWithAssociationForDial in quicreuse), so a dial
+	// that leaves from the listening port shows the punch does too.
+	It("dials from its listening port", func() {
+		app, desktop := newAppHost("/ip4/127.0.0.1/udp/0/quic-v1"), newDesktop()
+		Expect(connect(app, desktop)).To(Succeed())
+		conns := desktop.Network().ConnsToPeer(app.ID())
+		Expect(conns).To(HaveLen(1))
+		Expect(conns[0].RemoteMultiaddr()).To(BeElementOf(app.Network().ListenAddresses()),
+			"the desktop sees the app's dial come from a port the app does not listen on")
+	})
+
 	It("dials over QUIC without a UDP listener", func() {
 		app, desktop := newAppHost("/ip4/127.0.0.1/tcp/0"), newDesktop()
 		Expect(connect(app, desktop)).To(Succeed())

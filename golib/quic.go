@@ -27,7 +27,9 @@ func protectedListenUDP(network string, laddr *net.UDPAddr) (net.PacketConn, err
 // newProtectedQUICConnManager is an fx-injectable constructor for a
 // quicreuse.ConnManager with protected UDP sockets. It mirrors the default
 // ConnManager setup inside go-libp2p's config but overrides the UDP listener
-// with protectedListenUDP and disables reuseport (not reliable on Android).
+// with protectedListenUDP. Dials and hole punches reuse the listening
+// socket, so they leave from the advertised port: a hole punch opens the
+// phone's firewall only for the port its packets come from.
 func newProtectedQUICConnManager(
 	key quicgo.StatelessResetKey,
 	tokenKey quicgo.TokenGeneratorKey,
@@ -36,7 +38,6 @@ func newProtectedQUICConnManager(
 ) (*quicreuse.ConnManager, error) {
 	cm, err := quicreuse.NewConnManager(key, tokenKey,
 		quicreuse.OverrideListenUDP(protectedListenUDP),
-		quicreuse.DisableReuseport(),
 		quicreuse.ConnContext(func(ctx context.Context, clientInfo *quicgo.ClientInfo) (context.Context, error) {
 			addr, addrErr := quicreuse.ToQuicMultiaddr(clientInfo.RemoteAddr, quicgo.Version1)
 			if addrErr != nil {
