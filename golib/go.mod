@@ -6,7 +6,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.9.2
 	github.com/libp2p/go-libp2p v0.51.0
 	github.com/marcopolo/simnet v0.0.7
-	github.com/mudler/edgevpn v0.35.6-0.20261110175158-4533974923b0
+	github.com/mudler/edgevpn v0.36.0
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.42.1
