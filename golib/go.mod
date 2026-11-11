@@ -148,3 +148,6 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+// mudler's fork, which edgevpn also uses, runs pubsub over relayed connections and keeps a peer's subscriptions when a pubsub stream is reset.
+replace github.com/libp2p/go-libp2p-pubsub => github.com/mudler/go-libp2p-pubsub v0.0.0-20261110174907-d598e01e0c5c
