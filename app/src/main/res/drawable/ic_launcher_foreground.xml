@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The edgevpn logo: two cubes joined by a cable. It is drawn on a 512 unit
+     grid and scaled into the middle of the 108 dp adaptive icon, inside the
+     66 dp circle that every launcher mask leaves visible. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.1"
+        android:scaleY="0.1"
+        android:translateX="28.4"
+        android:translateY="28.4">
+        <path
+            android:pathData="M165,100 H355 A77.5,77.5 0 0 1 355,255 H165 A77.5,77.5 0 0 0 165,410 H345"
+            android:strokeColor="@color/logo_outline"
+            android:strokeWidth="18"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <group>
+            <path
+                android:fillColor="@color/logo_light"
+                android:pathData="M85,11 L162,55 L85,99 L8,55 Z M8,55 L85,99 L85,189 L8,145 Z" />
+            <path
+                android:fillColor="@color/logo_dark"
+                android:pathData="M85,99 L162,55 L162,145 L85,189 Z" />
+            <path
+                android:pathData="M85,11 L162,55 L162,145 L85,189 L8,145 L8,55 Z M8,55 L85,99 L162,55 M85,99 L85,189"
+                android:strokeColor="@color/logo_outline"
+                android:strokeWidth="22"
+                android:strokeLineJoin="round" />
+        </group>
+        <group
+            android:translateX="342"
+            android:translateY="312">
+            <path
+                android:fillColor="@color/logo_light"
+                android:pathData="M85,11 L162,55 L85,99 L8,55 Z M8,55 L85,99 L85,189 L8,145 Z" />
+            <path
+                android:fillColor="@color/logo_dark"
+                android:pathData="M85,99 L162,55 L162,145 L85,189 Z" />
+            <path
+                android:pathData="M85,11 L162,55 L162,145 L85,189 L8,145 L8,55 Z M8,55 L85,99 L162,55 M85,99 L85,189"
+                android:strokeColor="@color/logo_outline"
+                android:strokeWidth="22"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
+</vector>

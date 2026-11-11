@@ -29,4 +29,10 @@
     <color name="off_end">#475569</color>
     <color name="problem_start">#DC2626</color>
     <color name="problem_end">#B91C1C</color>
+
+    <!-- The launcher icon: the edgevpn logo's colors on white. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="logo_outline">#263040</color>
+    <color name="logo_light">#9BC2DC</color>
+    <color name="logo_dark">#3F5E86</color>
 </resources>
