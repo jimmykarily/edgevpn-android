@@ -151,3 +151,6 @@ require (
 
 // mudler's fork, which edgevpn also uses, runs pubsub over relayed connections and keeps a peer's subscriptions when a pubsub stream is reset.
 replace github.com/libp2p/go-libp2p-pubsub => github.com/mudler/go-libp2p-pubsub v0.0.0-20261110174907-d598e01e0c5c
+
+// edgevpn v0.36.0 plus mudler/edgevpn#1093 (one stream per peer for VPN packets), until a release has it.
+replace github.com/mudler/edgevpn => github.com/jimmykarily/edgevpn v0.0.0-20261112073228-dd68bbc1bffe
