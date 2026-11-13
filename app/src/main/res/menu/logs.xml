@@ -2,6 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/menu_share_file"
+        android:title="@string/logs_share_file"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/menu_copy_all"
         android:title="@string/logs_copy_all"
         app:showAsAction="never" />
