@@ -37,7 +37,7 @@ func TestLogLinesReachTheLogFileWithTheirDate(t *testing.T) {
 	got := readFile(t, path)
 	// The date, milliseconds and time zone let these lines be matched
 	// against the logs of the other nodes.
-	want := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} INFO  connected to brain\n$`)
+	want := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}(Z|[+-]\d{2}:\d{2}) INFO  connected to brain\n$`)
 	if !want.MatchString(got) {
 		t.Fatalf("log file = %q", got)
 	}
