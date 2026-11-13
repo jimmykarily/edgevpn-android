@@ -257,8 +257,8 @@ github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7Bd
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/jbenet/go-temp-err-catcher v0.1.0 h1:zpb3ZH6wIE8Shj2sKS+khgRvf7T7RABoLk/+KKHggpk=
 github.com/jbenet/go-temp-err-catcher v0.1.0/go.mod h1:0kJRvmDZXNMIiJirNPEYfhpPwbGVtZVWC34vc5WLsDk=
-github.com/jimmykarily/edgevpn v0.0.0-20261112073228-dd68bbc1bffe h1:vS150j/EMc/B08/BIHVAMG6Vyy015HzYABD1r+dr4B0=
-github.com/jimmykarily/edgevpn v0.0.0-20261112073228-dd68bbc1bffe/go.mod h1:0ZoP9zh4KOxs8bsuf7kDR/4KOdW5+PxqOT7yv3x6IZw=
+github.com/jimmykarily/edgevpn v0.0.0-20261113184704-0cb8799d8576 h1:Mjcp3FtnN+DGh4WqvlnPOFPlvN+If75P34EaPViMlMQ=
+github.com/jimmykarily/edgevpn v0.0.0-20261113184704-0cb8799d8576/go.mod h1:0ZoP9zh4KOxs8bsuf7kDR/4KOdW5+PxqOT7yv3x6IZw=
 github.com/joshdk/go-junit v1.0.0 h1:S86cUKIdwBHWwA6xCmFlf3RTLfVXYQfvanM5Uh+K6GE=
 github.com/joshdk/go-junit v1.0.0/go.mod h1:TiiV0PqkaNfFXjEiyjWM3XXrhVyCa1K4Zfga6W52ung=
 github.com/json-iterator/go v1.1.11/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
