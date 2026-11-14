@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The share provider hands out only the exported log copy in the cache, never the live log
+     file or anything else the app keeps. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

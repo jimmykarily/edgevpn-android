@@ -62,6 +62,7 @@ class EdgeVpnService : VpnService() {
 
     override fun onCreate() {
         super.onCreate()
+        LogFile.attach(this)
         createNotificationChannel()
     }
 

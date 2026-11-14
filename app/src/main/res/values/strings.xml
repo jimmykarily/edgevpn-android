@@ -67,6 +67,8 @@
     <string name="logs_copy_all">Copy all</string>
     <string name="logs_copied">Logs copied</string>
     <string name="logs_nothing_to_copy">Nothing to copy yet.</string>
+    <string name="logs_share_file">Share log file</string>
+    <string name="logs_share_failed">The log file could not be shared.</string>
     <string name="logs_empty">Nothing has been logged yet.</string>
     <string name="logs_detailed_note">Network library details are in the developer log (logcat).</string>
 

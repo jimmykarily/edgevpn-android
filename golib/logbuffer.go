@@ -139,10 +139,12 @@ func emit(level, msg string) {
 	if !shouldEmit(level) {
 		return
 	}
-	ts := time.Now().Format("15:04:05")
-	line := fmt.Sprintf("[%s] %s %s", ts, level, redactLine(msg))
+	now := time.Now()
+	msg = redactLine(msg)
+	line := fmt.Sprintf("[%s] %s %s", now.Format("15:04:05"), level, msg)
 	ringAppend(line)
 	writeLogcat(level, line)
+	writeLogFile(now, level, msg)
 }
 
 func joinArgs(args ...interface{}) string {

@@ -3,11 +3,13 @@ package com.kairos.edgevpn
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PersistableBundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -15,6 +17,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.google.android.material.appbar.MaterialToolbar
 import edgevpn.Edgevpn
 
@@ -71,10 +74,27 @@ class LogsActivity : AppCompatActivity() {
         if (stick) scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
     }
 
-    private fun onMenuItem(item: MenuItem): Boolean {
-        if (item.itemId != R.id.menu_copy_all) return false
-        copyAll()
-        return true
+    private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
+        R.id.menu_copy_all -> { copyAll(); true }
+        R.id.menu_share_file -> { shareFile(); true }
+        else -> false
+    }
+
+    /** Sends the log file, which holds far more than the screen, to an app the user picks. */
+    private fun shareFile() {
+        val uri = try {
+            FileProvider.getUriForFile(this, "$packageName.logs", LogFile.export(this))
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot export the log file", e)
+            Toast.makeText(this, R.string.logs_share_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(send, getString(R.string.logs_share_file)))
     }
 
     private fun copyAll() {
@@ -94,6 +114,7 @@ class LogsActivity : AppCompatActivity() {
     }
 
     private companion object {
+        const val TAG = "EdgeVPN"
         const val POLL_MS = 1000L
         const val SLACK_DP = 8
     }
