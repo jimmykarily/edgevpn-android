@@ -47,6 +47,12 @@ func TestNetworkConfigMatchesCLIDefaults(t *testing.T) {
 	if !cfg.Discovery.DHT {
 		t.Error("Discovery.DHT = false, want true")
 	}
+	// The DHT discovery ticker backs off up to this interval. At zero it
+	// ticks again as soon as a round ends, and without a network a round
+	// ends in milliseconds.
+	if cfg.Discovery.Interval != 720*time.Second {
+		t.Errorf("Discovery.Interval = %v, want 12m0s like the CLI default", cfg.Discovery.Interval)
+	}
 	// A phone with a public address would otherwise carry relayed traffic
 	// for any libp2p node on the internet, on the user's data plan.
 	if !cfg.Connection.RelayService.Disabled {

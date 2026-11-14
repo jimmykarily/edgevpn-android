@@ -84,6 +84,11 @@ func networkConfig(token, address string) config.Config {
 			// on a network change and keep it off on mobile data.
 			MDNS:           false,
 			BootstrapPeers: bootstrapPeers(),
+			// The CLI default (cmd/util.go: discovery-interval=720). The
+			// discovery ticker backs off up to this interval, and at zero
+			// it starts a new round as soon as the last one ends: without a
+			// network that is many rounds a second, each one logged.
+			Interval: 720 * time.Second,
 		},
 		// Match the CLI defaults (cmd/util.go: autorelay=true, holepunch=true).
 		// These are essential for NAT traversal when both peers are behind NAT:
