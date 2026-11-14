@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import edgevpn.Edgevpn
 
 /** Shows the Go library's recent log lines, refreshed every second while visible. */
@@ -77,6 +78,7 @@ class LogsActivity : AppCompatActivity() {
     private fun onMenuItem(item: MenuItem): Boolean = when (item.itemId) {
         R.id.menu_copy_all -> { copyAll(); true }
         R.id.menu_share_file -> { shareFile(); true }
+        R.id.menu_clear_file -> { askToClearFile(); true }
         else -> false
     }
 
@@ -95,6 +97,27 @@ class LogsActivity : AppCompatActivity() {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(send, getString(R.string.logs_share_file)))
+    }
+
+    private fun askToClearFile() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.logs_clear_file)
+            .setMessage(R.string.logs_clear_file_question)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.logs_clear) { _, _ -> clearFile() }
+            .show()
+    }
+
+    private fun clearFile() {
+        try {
+            LogFile.clear(this)
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot clear the log file", e)
+            Toast.makeText(this, R.string.logs_clear_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, R.string.logs_cleared, Toast.LENGTH_SHORT).show()
+        refresh()
     }
 
     private fun copyAll() {
