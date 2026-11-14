@@ -106,6 +106,24 @@ func dropLogFileLocked(err error) {
 	writeLogcat("WARN ", fmt.Sprintf("stopped writing the log file %s: %v", path, err))
 }
 
+// ClearLogFile empties the log file and deletes its backup. The file stays
+// open, so the lines logged after this go to the emptied file.
+func ClearLogFile() error {
+	logFileMu.Lock()
+	defer logFileMu.Unlock()
+	if logFile == nil {
+		return errors.New("no log file is set")
+	}
+	if err := logFile.Truncate(0); err != nil {
+		return err
+	}
+	logFileSize = 0
+	if err := os.Remove(logFilePath + ".1"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
 // ExportLogs writes the log backup and then the current log file, oldest line
 // first, into one file at dst, for the user to share.
 func ExportLogs(dst string) error {

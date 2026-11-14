@@ -159,3 +159,48 @@ func TestExportLogsWithoutAFileFails(t *testing.T) {
 		t.Fatal("ExportLogs succeeded without a log file")
 	}
 }
+
+func TestClearLogFileEmptiesTheFileAndItsBackup(t *testing.T) {
+	old := logFileMaxBytes
+	logFileMaxBytes = 100
+	t.Cleanup(func() { logFileMaxBytes = old })
+	path := useLogFile(t)
+	emit("INFO ", "first line, which ends up in the backup")
+	emit("INFO ", "second line")
+	if _, err := os.Stat(path + ".1"); err != nil {
+		t.Fatalf("the test did not fill the log file: %v", err)
+	}
+
+	if err := ClearLogFile(); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, path); got != "" {
+		t.Fatalf("log file after clearing = %q", got)
+	}
+	if _, err := os.Stat(path + ".1"); !os.IsNotExist(err) {
+		t.Fatalf("the backup is still there after clearing: %v", err)
+	}
+}
+
+// The service keeps logging while the user clears the file, and those lines
+// belong in the file from then on.
+func TestTheLogFileKeepsWritingAfterItIsCleared(t *testing.T) {
+	path := useLogFile(t)
+	emit("INFO ", "before clearing")
+	if err := ClearLogFile(); err != nil {
+		t.Fatal(err)
+	}
+	emit("INFO ", "after clearing")
+
+	got := readFile(t, path)
+	if !regexp.MustCompile(`^\S+ INFO  after clearing\n$`).MatchString(got) {
+		t.Fatalf("log file = %q", got)
+	}
+}
+
+func TestClearLogFileWithoutAFileFails(t *testing.T) {
+	resetLogs(t)
+	if err := ClearLogFile(); err == nil {
+		t.Fatal("ClearLogFile succeeded without a log file")
+	}
+}

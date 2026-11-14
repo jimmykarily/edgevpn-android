@@ -69,6 +69,11 @@
     <string name="logs_nothing_to_copy">Nothing to copy yet.</string>
     <string name="logs_share_file">Share log file</string>
     <string name="logs_share_failed">The log file could not be shared.</string>
+    <string name="logs_clear_file">Clear log file</string>
+    <string name="logs_clear_file_question">Delete everything logged so far? Lines logged from now on start a new file.</string>
+    <string name="logs_clear">Clear</string>
+    <string name="logs_cleared">Log file cleared</string>
+    <string name="logs_clear_failed">The log file could not be cleared.</string>
     <string name="logs_empty">Nothing has been logged yet.</string>
     <string name="logs_detailed_note">Network library details are in the developer log (logcat).</string>
 
