@@ -27,6 +27,17 @@ object LogFile {
         }
     }
 
+    /**
+     * Empties the log file, deletes its backup and the last shared copy, and
+     * empties the in-memory buffer behind the Logs screen.
+     */
+    fun clear(c: Context) {
+        attach(c)
+        Edgevpn.clearLogFile()
+        Edgevpn.clearLogs()
+        File(File(c.cacheDir, SHARE_DIR), SHARE_NAME).delete()
+    }
+
     /** Copies the log, oldest line first, into one file the share provider can hand out. */
     fun export(c: Context): File {
         attach(c)
