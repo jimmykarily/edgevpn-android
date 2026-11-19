@@ -10,10 +10,14 @@ object AppSettings {
     private const val KEY_NAME = "name"
     private const val KEY_DETAILED_LOGS = "detailed_logs"
     private const val KEY_RELAY_FOR_OTHERS = "relay_for_others"
+    private const val KEY_SAVE_MOBILE_DATA = "save_mobile_data"
     private const val KEY_EXTRA_PEERS = "extra_peers"
     private const val KEY_CHECK_IN_SECONDS = "check_in_seconds"
     private const val KEY_DATA_USAGE = "data_usage"
     private const val DEFAULT_ADDRESS = "10.1.0.2"
+
+    /** What "Save mobile data" is until the user changes it, and after "Start fresh". */
+    const val DEFAULT_SAVE_MOBILE_DATA = true
 
     fun address(c: Context): String =
         TokenStore.prefs(c).getString(KEY_ADDRESS, null) ?: DEFAULT_ADDRESS
@@ -44,6 +48,14 @@ object AppSettings {
 
     fun setRelayForOthers(c: Context, v: Boolean) {
         TokenStore.prefs(c).edit().putBoolean(KEY_RELAY_FOR_OTHERS, v).apply()
+    }
+
+    /** Whether the phone pauses its search for devices while connected to all of them, for Edgevpn.setSaveMobileData. */
+    fun saveMobileData(c: Context): Boolean =
+        TokenStore.prefs(c).getBoolean(KEY_SAVE_MOBILE_DATA, DEFAULT_SAVE_MOBILE_DATA)
+
+    fun setSaveMobileData(c: Context, v: Boolean) {
+        TokenStore.prefs(c).edit().putBoolean(KEY_SAVE_MOBILE_DATA, v).apply()
     }
 
     /**

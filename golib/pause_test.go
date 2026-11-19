@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mudler/edgevpn/pkg/config"
 	"github.com/mudler/edgevpn/pkg/services"
 )
 
@@ -57,5 +58,28 @@ func TestLookForDevicesWithoutASession(t *testing.T) {
 	Stop()
 	if LookForDevices() {
 		t.Fatal("LookForDevices reported a session after Stop")
+	}
+}
+
+func TestSaveMobileDataIsOnByDefault(t *testing.T) {
+	if !SaveMobileData() {
+		t.Fatal("SaveMobileData is off before anyone set it")
+	}
+}
+
+func TestDiscoveryPausesOnlyWhenSavingMobileData(t *testing.T) {
+	p := services.NewDiscoveryPause(&bufferLogger{}, checkInInterval())
+	var on, off config.Discovery
+	configureDiscoveryPause(&on, p, true)
+	configureDiscoveryPause(&off, p, false)
+	if on.Pause == nil {
+		t.Fatal("Pause is not set with Save mobile data on")
+	}
+	if off.Pause != nil {
+		t.Fatal("Pause is set with Save mobile data off")
+	}
+	// A round asked for by the user or by a network change starts in both cases.
+	if on.Wake == nil || off.Wake == nil {
+		t.Fatal("Wake is not set, so Look for devices now would do nothing")
 	}
 }

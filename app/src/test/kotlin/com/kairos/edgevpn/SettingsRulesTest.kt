@@ -43,10 +43,15 @@ class SettingsRulesTest {
 
     @Test
     fun relayChangeAsksToReconnectOnlyWhenTheRunningVpnStartedWithTheOtherValue() {
-        assertFalse(relayChangeAsksReconnect(vpnRunning = false, runningWith = false, chosen = true))
-        assertTrue(relayChangeAsksReconnect(vpnRunning = true, runningWith = false, chosen = true))
-        assertTrue(relayChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = false))
+        assertFalse(startSettingChangeAsksReconnect(vpnRunning = false, runningWith = false, chosen = true))
+        assertTrue(startSettingChangeAsksReconnect(vpnRunning = true, runningWith = false, chosen = true))
+        assertTrue(startSettingChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = false))
         // Switched back before reconnecting: the VPN already runs with this value.
-        assertFalse(relayChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = true))
+        assertFalse(startSettingChangeAsksReconnect(vpnRunning = true, runningWith = true, chosen = true))
+    }
+
+    @Test
+    fun saveMobileDataIsOnUntilTheUserTurnsItOff() {
+        assertTrue(AppSettings.DEFAULT_SAVE_MOBILE_DATA)
     }
 }

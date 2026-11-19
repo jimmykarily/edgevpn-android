@@ -99,4 +99,32 @@ class SettingsScreenTest {
             onView(withText("Technical details")).perform(nestedScrollTo()).check(matches(isDisplayed()))
         }
     }
+
+    @Test
+    fun saveMobileDataIsOnAfterStartFreshAndItsHelpOpens() {
+        AppSettings.setSaveMobileData(context, false)
+        AppSettings.startFresh(context)
+        assertTrue(AppSettings.saveMobileData(context))
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.saveMobileDataSwitch)).perform(nestedScrollTo()).check(matches(isChecked()))
+            onView(withId(R.id.saveMobileDataTitle)).perform(nestedScrollTo(), clickHelpIcon())
+
+            onView(withId(R.id.helpTitle)).check(matches(allOf(isDisplayed(), withText("Save mobile data"))))
+            onView(withText(containsString("Look for devices now"))).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun tappingSaveMobileDataTurnsItOffAndItStaysOff() {
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.saveMobileDataSwitch)).perform(nestedScrollTo()).check(matches(isChecked()))
+            onView(withId(R.id.saveMobileDataSub)).perform(click())
+            onView(withId(R.id.saveMobileDataSwitch)).check(matches(isNotChecked()))
+            onView(withText("Reconnect now to apply this change?")).check(doesNotExist())
+        }
+        assertFalse(AppSettings.saveMobileData(context))
+        ActivityScenario.launch(SettingsActivity::class.java).use {
+            onView(withId(R.id.saveMobileDataSwitch)).perform(nestedScrollTo()).check(matches(isNotChecked()))
+        }
+    }
 }

@@ -196,6 +196,59 @@
                 android:layout_marginStart="6dp"
                 android:layout_marginTop="18dp"
                 android:layout_marginBottom="8dp"
+                android:text="@string/section_data_saving" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.EdgeVPN.WhiteCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/saveMobileDataRow"
+                        style="@style/Widget.EdgeVPN.SettingsRow">
+
+                        <ImageView
+                            style="@style/Widget.EdgeVPN.SettingsIcon"
+                            android:src="@drawable/ic_sync" />
+
+                        <LinearLayout style="@style/Widget.EdgeVPN.SettingsText">
+
+                            <TextView
+                                android:id="@+id/saveMobileDataTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_save_mobile_data"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowTitle" />
+
+                            <TextView
+                                android:id="@+id/saveMobileDataSub"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/setting_save_mobile_data_sub"
+                                android:textAppearance="@style/TextAppearance.EdgeVPN.RowSub" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/saveMobileDataSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                style="@style/TextAppearance.EdgeVPN.Section"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="8dp"
                 android:text="@string/section_troubleshooting" />
 
             <com.google.android.material.card.MaterialCardView
