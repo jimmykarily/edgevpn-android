@@ -162,6 +162,7 @@ class EdgeVpnService : VpnService() {
         Edgevpn.setDetailedLogs(AppSettings.detailedLogs(this))
         Edgevpn.setCheckInSeconds(AppSettings.checkInSeconds(this).toLong())
         Edgevpn.setRelayForOthers(AppSettings.relayForOthers(this))
+        Edgevpn.setSaveMobileData(AppSettings.saveMobileData(this))
         try {
             Edgevpn.setExtraPeers(AppSettings.extraPeers(this))
         } catch (e: Exception) {

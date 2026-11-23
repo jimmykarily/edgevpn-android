@@ -55,6 +55,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var addressValue: TextView
     private lateinit var detailedLogsSwitch: MaterialSwitch
     private lateinit var relayForOthersSwitch: MaterialSwitch
+    private lateinit var saveMobileDataSwitch: MaterialSwitch
     private lateinit var phoneIdValue: TextView
 
     /** The full phone ID, once it has been read. */
@@ -81,12 +82,14 @@ class SettingsActivity : AppCompatActivity() {
         addressValue = findViewById(R.id.addressValue)
         detailedLogsSwitch = findViewById(R.id.detailedLogsSwitch)
         relayForOthersSwitch = findViewById(R.id.relayForOthersSwitch)
+        saveMobileDataSwitch = findViewById(R.id.saveMobileDataSwitch)
         phoneIdValue = findViewById(R.id.phoneIdValue)
 
         helpIcon(R.id.nameTitle, HelpTerm.NAME)
         helpIcon(R.id.addressTitle, HelpTerm.ADDRESS)
         helpIcon(R.id.detailedLogsTitle, HelpTerm.DETAILED_LOGS)
         helpIcon(R.id.relayForOthersTitle, HelpTerm.RELAY_FOR_OTHERS)
+        helpIcon(R.id.saveMobileDataTitle, HelpTerm.SAVE_MOBILE_DATA)
         helpIcon(R.id.phoneIdTitle, HelpTerm.PHONE_ID)
         helpIcon(R.id.startFreshTitle, HelpTerm.START_FRESH)
 
@@ -99,6 +102,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.detailedLogsRow).setOnClickListener { detailedLogsSwitch.toggle() }
         findViewById<View>(R.id.relayForOthersRow).setOnClickListener { relayForOthersSwitch.toggle() }
+        findViewById<View>(R.id.saveMobileDataRow).setOnClickListener { saveMobileDataSwitch.toggle() }
         findViewById<View>(R.id.phoneIdRow).setOnClickListener { copyPhoneId() }
         findViewById<View>(R.id.startFreshRow).setOnClickListener { confirmStartFresh() }
 
@@ -113,7 +117,16 @@ class SettingsActivity : AppCompatActivity() {
         relayForOthersSwitch.isChecked = AppSettings.relayForOthers(this)
         relayForOthersSwitch.setOnCheckedChangeListener { _, on ->
             AppSettings.setRelayForOthers(this, on)
-            if (relayChangeAsksReconnect(EdgeVpnService.isRunning, Edgevpn.relayForOthers(), on)) {
+            if (startSettingChangeAsksReconnect(EdgeVpnService.isRunning, Edgevpn.relayForOthers(), on)) {
+                handler.post { askReconnect(R.string.reconnect_setting_text) }
+            }
+        }
+
+        // Like the relay, only the service passes this to Go, before each start.
+        saveMobileDataSwitch.isChecked = AppSettings.saveMobileData(this)
+        saveMobileDataSwitch.setOnCheckedChangeListener { _, on ->
+            AppSettings.setSaveMobileData(this, on)
+            if (startSettingChangeAsksReconnect(EdgeVpnService.isRunning, Edgevpn.saveMobileData(), on)) {
                 handler.post { askReconnect(R.string.reconnect_setting_text) }
             }
         }
@@ -356,6 +369,7 @@ class SettingsActivity : AppCompatActivity() {
             val facts = PhoneFacts(
                 detailedLogs = AppSettings.detailedLogs(this),
                 relayForOthers = AppSettings.relayForOthers(this),
+                saveMobileData = AppSettings.saveMobileData(this),
             )
             liveValues(term, model, null, facts)
         }

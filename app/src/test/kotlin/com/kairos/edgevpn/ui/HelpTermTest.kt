@@ -34,7 +34,7 @@ class HelpTermTest {
 
     @Test
     fun oneTermPerGlossaryRow() {
-        assertEquals(32, HelpTerm.values().size)
+        assertEquals(33, HelpTerm.values().size)
     }
 
     @Test
@@ -160,6 +160,15 @@ class HelpTermTest {
     }
 
     @Test
+    fun phoneFactsFeedSaveMobileData() {
+        assertEquals(
+            listOf("Save mobile data" to "Off"),
+            liveValues(HelpTerm.SAVE_MOBILE_DATA, model, null, PhoneFacts(saveMobileData = false)),
+        )
+        assertTrue(liveValues(HelpTerm.SAVE_MOBILE_DATA, model, null).isEmpty())
+    }
+
+    @Test
     fun phoneFactsFeedUsingAndDetailedLogs() {
         val facts = PhoneFacts(using = "Wi-Fi", detailedLogs = true)
         assertEquals(listOf("Using" to "Wi-Fi"), liveValues(HelpTerm.USING, model, null, facts))
@@ -206,6 +215,7 @@ class HelpTermTest {
             HelpTerm.ADDRESS to LiveScope.PHONE,
             HelpTerm.DETAILED_LOGS to LiveScope.PHONE,
             HelpTerm.RELAY_FOR_OTHERS to LiveScope.PHONE,
+            HelpTerm.SAVE_MOBILE_DATA to LiveScope.PHONE,
             HelpTerm.PHONE_ID to LiveScope.PHONE,
             HelpTerm.START_FRESH to LiveScope.PHONE,
             HelpTerm.ADDRESS_IN_USE to LiveScope.PHONE,

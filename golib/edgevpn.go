@@ -182,8 +182,7 @@ func Start(fd int, token string, nodeKey []byte, address string, name string) er
 	cfg := networkConfig(normalizeToken(token), address)
 	// One pause per session: it keeps state for one node run.
 	pause := services.NewDiscoveryPause(llger, checkInInterval())
-	cfg.Discovery.Pause = pause.Pause
-	cfg.Discovery.Wake = pause.Wake()
+	configureDiscoveryPause(&cfg.Discovery, pause, SaveMobileData())
 
 	SetMinLogLevel(cfg.LogLevel)
 	nodeOpts, vpnOpts, err := cfg.ToOpts(llger)

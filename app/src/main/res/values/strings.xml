@@ -14,6 +14,7 @@
     <string name="net_leave">Leave network</string>
     <string name="net_join">Join network</string>
     <string name="section_this_phone">This phone</string>
+    <string name="section_data_saving">Saving data</string>
     <string name="section_troubleshooting">Troubleshooting</string>
     <string name="section_about">About</string>
     <string name="setting_name">Name</string>
@@ -26,6 +27,8 @@
     <string name="setting_detailed_logs_sub">Much more detail. Uses more battery, so turn it off when done.</string>
     <string name="setting_relay_for_others">Relay for other devices</string>
     <string name="setting_relay_for_others_sub">Helps other devices behind a router reach each other. Uses some data and battery.</string>
+    <string name="setting_save_mobile_data">Save mobile data</string>
+    <string name="setting_save_mobile_data_sub">Stops searching for devices while connected to all of them.</string>
     <string name="setting_phone_id">Phone ID</string>
     <string name="setting_phone_id_sub">%1$s · tap to copy</string>
     <string name="phone_id_copied">Phone ID copied</string>
@@ -224,6 +227,9 @@
     <string name="help_relay_for_others_title">Relay for other devices</string>
     <string name="help_relay_for_others_plain">Lets other devices on the internet pass the start of a connection through this phone, so that two devices behind home routers can find a direct path to each other. Any device that uses the same peer-to-peer system (libp2p) can use it, not only yours. It uses some data and battery. Each relayed connection is cut after 2 minutes or 128 KB, whichever comes first. It only works while this phone can be reached from the internet, for example on some Wi-Fi networks with IPv6.</string>
     <string name="help_relay_for_others_tech">Runs the libp2p circuit relay v2 service with go-libp2p\'s default limits: 128 KiB per direction and 2 minutes per relayed connection, 16 circuits per peer, 128 reservations, a reservation TTL of 1 hour and a 2048 byte buffer per circuit. go-libp2p starts the service only while AutoNAT reports the phone as publicly reachable. Any peer may reserve a slot; there is no check that it belongs to your network. The service starts with the VPN, so a change applies after a reconnect.</string>
+    <string name="help_save_mobile_data_title">Save mobile data</string>
+    <string name="help_save_mobile_data_plain">While this is on, the phone stops searching for your devices once it is connected to every device that is on, and it searches again when one of them drops or about once an hour. This cuts the data the VPN uses while idle a lot. The cost is that a device that comes online while all the others are paused may not find this phone for up to an hour. Choose Look for devices now in the menu to find a new device at once. Turn this off to search on the regular schedule. A change applies after a reconnect.</string>
+    <string name="help_save_mobile_data_tech">With it on, the DHT discovery loop skips its regular rounds while every peer that checked in recently has a direct connection, with a round at least once an hour, when a peer loses its connection, when this phone\'s addresses change and when you ask. With it off, the loop keeps searching, backing off to every 12 minutes, like an edgevpn node with default flags. The one hour DHT routing table refresh applies either way. The setting is read when the VPN starts.</string>
     <string name="help_phone_id_title">Phone ID</string>
     <string name="help_phone_id_plain">A unique identifier for this phone in your network.</string>
     <string name="help_phone_id_tech">The libp2p peer ID, derived from the phone\'s Ed25519 identity key. It signs this phone\'s ledger entries.</string>
